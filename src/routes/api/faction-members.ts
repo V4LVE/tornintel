@@ -25,9 +25,23 @@ const THIRTY_MINUTES = 30 * 60 * 1000
 export const Route = createFileRoute('/api/faction-members')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         const apiKey = process.env.TORN_API_KEY
-        const factionId = process.env.TORN_ENEMY_FACTION_ID ?? '56833'
+        const requestedFactionId = new URL(request.url).searchParams.get(
+          'factionId',
+        )
+        const factionId =
+          requestedFactionId || process.env.TORN_ENEMY_FACTION_ID || '56833'
+
+        if (!/^\d{1,10}$/.test(factionId)) {
+          console.warn('[tornintel] Rejected invalid faction ID', {
+            factionId: requestedFactionId,
+          })
+          return Response.json(
+            { error: 'Faction ID must contain digits only.' },
+            { status: 400 },
+          )
+        }
 
         if (!apiKey) {
           return Response.json(
@@ -48,6 +62,11 @@ export const Route = createFileRoute('/api/faction-members')({
 
           const faction = (await response.json()) as TornFactionResponse
           if (faction.error) {
+            console.error('[tornintel] Torn rejected faction request', {
+              factionId,
+              code: faction.error.code,
+              message: faction.error.error,
+            })
             return Response.json(
               { error: faction.error.error },
               { status: 502 },
@@ -74,7 +93,10 @@ export const Route = createFileRoute('/api/faction-members')({
             { headers: { 'Cache-Control': 'no-store' } },
           )
         } catch (error) {
-          console.error('Unable to fetch Torn faction members', error)
+          console.error('[tornintel] Faction fetch failed', {
+            factionId,
+            message: error instanceof Error ? error.message : String(error),
+          })
           return Response.json(
             {
               error: 'Unable to reach Torn right now. Try refreshing shortly.',

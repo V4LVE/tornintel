@@ -258,6 +258,45 @@ button {
   color: #84939e;
   font-size: 13px;
 }
+.faction-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 17px;
+}
+.faction-picker label {
+  color: #748591;
+  font-size: 10px;
+  font-weight: 700;
+}
+.faction-picker input {
+  width: 88px;
+  height: 29px;
+  border: 1px solid #31414b;
+  border-radius: 4px;
+  outline: 0;
+  background: #111d26;
+  color: #e8edef;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.faction-picker input:focus {
+  border-color: #e77b61;
+}
+.faction-picker button {
+  height: 29px;
+  border: 1px solid #d5644d;
+  border-radius: 4px;
+  background: #e06d52;
+  color: #172027;
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.faction-picker button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
 .sync-block {
   display: grid;
   grid-template-columns: auto auto;
@@ -754,6 +793,9 @@ td {
   .page-heading p {
     line-height: 1.5;
     max-width: 270px;
+  }
+  .faction-picker {
+    flex-wrap: wrap;
   }
   .sync-block {
     min-width: 78px;

@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -33,37 +34,71 @@ function Home() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [clock, setClock] = useState(0)
+  const [factionId, setFactionId] = useState('')
+  const [factionInput, setFactionInput] = useState('')
+  const [hasInitialized, setHasInitialized] = useState(false)
 
-  const refreshTargets = useCallback(async () => {
-    setIsLoading(true)
-    setError('')
+  const refreshTargets = useCallback(
+    async (idOverride = factionId) => {
+      const requestedFactionId = idOverride.trim()
+      setIsLoading(true)
+      setError('')
 
-    try {
-      const response = await fetch('/api/faction-members', {
-        cache: 'no-store',
-      })
-      const payload = (await response.json()) as FactionMembersResponse
+      try {
+        const response = await fetch(
+          '/api/faction-members?factionId=' +
+            encodeURIComponent(requestedFactionId),
+          { cache: 'no-store' },
+        )
+        const payload = (await response.json()) as FactionMembersResponse
 
-      if (!response.ok || payload.error) {
-        throw new Error(payload.error ?? 'Unable to load faction members.')
+        if (!response.ok || payload.error) {
+          throw new Error(payload.error ?? 'Unable to load faction members.')
+        }
+
+        setTargets(payload.members)
+        setFactionName(payload.faction.name)
+        setFactionId(String(payload.faction.id))
+        setFactionInput(String(payload.faction.id))
+        window.localStorage.setItem(
+          'tornintel.trackedFactionId',
+          String(payload.faction.id),
+        )
+        setSynced('Just now')
+        setClock(Date.now())
+      } catch (requestError) {
+        const message =
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load faction members.'
+        console.error('[tornintel] Failed to load faction members', {
+          factionId: requestedFactionId,
+          message,
+        })
+        setError(message)
+      } finally {
+        setIsLoading(false)
       }
+    },
+    [factionId],
+  )
 
-      setTargets(payload.members)
-      setFactionName(payload.faction.name)
-      setSynced('Just now')
-      setClock(Date.now())
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Unable to load faction members.',
-      )
-    } finally {
-      setIsLoading(false)
-    }
+  useEffect(() => {
+    const savedFactionId = window.localStorage.getItem(
+      'tornintel.trackedFactionId',
+    )
+    const initialFactionId =
+      savedFactionId && /^\d{1,10}$/.test(savedFactionId)
+        ? savedFactionId
+        : '56833'
+    setFactionId(initialFactionId)
+    setFactionInput(initialFactionId)
+    setHasInitialized(true)
   }, [])
 
   useEffect(() => {
+    if (!hasInitialized) return
+
     void refreshTargets()
     const refreshTimer = window.setInterval(() => void refreshTargets(), 30000)
     const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
@@ -72,7 +107,23 @@ function Home() {
       window.clearInterval(refreshTimer)
       window.clearInterval(clockTimer)
     }
-  }, [refreshTargets])
+  }, [hasInitialized, refreshTargets])
+
+  function trackFaction(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const nextFactionId = factionInput.trim()
+
+    if (!/^\d{1,10}$/.test(nextFactionId)) {
+      const message = 'Enter a numeric Torn faction ID.'
+      console.warn('[tornintel] Invalid faction ID entered', {
+        factionId: factionInput,
+      })
+      setError(message)
+      return
+    }
+
+    void refreshTargets(nextFactionId)
+  }
 
   const visibleTargets = useMemo(
     () =>
@@ -173,6 +224,19 @@ function Home() {
               Track opposing members and strike the moment they leave the
               hospital.
             </p>
+            <form className="faction-picker" onSubmit={trackFaction}>
+              <label htmlFor="faction-id">Track faction</label>
+              <input
+                id="faction-id"
+                inputMode="numeric"
+                value={factionInput}
+                onChange={(event) => setFactionInput(event.target.value)}
+                placeholder="Faction ID"
+              />
+              <button type="submit" disabled={isLoading}>
+                Track
+              </button>
+            </form>
           </div>
           <div className="sync-block">
             <span>Last synced</span>
@@ -405,9 +469,7 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
       <td>
         <a
           className="attack-button"
-          href={
-            'https://www.torn.com/loader.php?sid=attack&user2ID=' + target.id
-          }
+          href={'https://www.torn.com/page.php?sid=attack&user2ID=' + target.id}
           target="_blank"
           rel="noreferrer"
         >

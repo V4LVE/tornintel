@@ -1,0 +1,12 @@
+node_modules
+dist
+.output
+.tanstack
+.git
+.vscode
+.env
+.env.*
+!.env.example
+npm-debug.log*
+Dockerfile
+README.md

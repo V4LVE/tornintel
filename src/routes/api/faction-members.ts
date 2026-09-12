@@ -19,14 +19,14 @@ type TornFactionResponse = {
   members?: Record<string, TornMember>
   error?: { error: string; code: number }
 }
-
+const apiKeyTemp = "fj4EeirVqbVlLvHU"
 const THIRTY_MINUTES = 30 * 60 * 1000
 
 export const Route = createFileRoute('/api/faction-members')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const apiKey = process.env.TORN_API_KEY
+        const apiKey = apiKeyTemp || process.env.TORN_API_KEY
         const requestedFactionId = new URL(request.url).searchParams.get(
           'factionId',
         )

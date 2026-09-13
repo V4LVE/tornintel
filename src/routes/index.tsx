@@ -347,7 +347,13 @@ function Home() {
             >
               <span>&#8635;</span> {isLoading ? 'Refreshing' : 'Refresh'}
             </button>
-            <button onClick={togglePause} className="pause-button">
+            <button
+              onClick={togglePause}
+              className={isPaused ? 'pause-button paused' : 'pause-button'}
+              aria-pressed={isPaused}
+              title="Pause or resume War Hospital API polling"
+            >
+              <span aria-hidden="true">{isPaused ? '▶' : 'Ⅱ'}</span>
               {isPaused
                 ? 'Resume hospital tracking'
                 : 'Pause hospital tracking'}

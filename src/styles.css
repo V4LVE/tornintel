@@ -328,10 +328,42 @@ button {
 }
 .pause-button {
   grid-column: 2;
-  color: #9aa9b4;
-  font-size: 10px;
-  padding: 6px 0 0;
+  justify-self: end;
+  border: 1px solid #9e5948;
+  border-radius: 5px;
+  background: #3a2929;
+  color: #ffad93;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 8px 11px;
   text-align: right;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.pause-button span {
+  display: inline-block;
+  margin-right: 7px;
+  font-size: 10px;
+}
+.pause-button:hover,
+.pause-button:focus-visible {
+  border-color: #f18b72;
+  background: #55302d;
+  color: #ffd0c0;
+  outline: none;
+}
+.pause-button.paused {
+  border-color: #4f9b76;
+  background: #1d3c32;
+  color: #9de5ba;
+}
+.pause-button.paused:hover,
+.pause-button.paused:focus-visible {
+  border-color: #75d89d;
+  background: #285343;
+  color: #c7f5d7;
 }
 .refresh-button:disabled,
 .add-button:disabled {
@@ -986,6 +1018,8 @@ td {
   .pause-button {
     grid-column: 1 / -1;
     text-align: left;
+    justify-self: start;
+    margin-top: 4px;
   }
   .stat-grid {
     gap: 9px;

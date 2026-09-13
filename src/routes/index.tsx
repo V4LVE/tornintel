@@ -32,15 +32,25 @@ function Home() {
   const [factionName, setFactionName] = useState('Enemy faction')
   const [synced, setSynced] = useState('Waiting for data')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [clock, setClock] = useState(0)
   const [factionId, setFactionId] = useState('')
   const [factionInput, setFactionInput] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [isPaused, setIsPaused] = useState(false)
   const [hasInitialized, setHasInitialized] = useState(false)
 
   const refreshTargets = useCallback(
-    async (idOverride = factionId) => {
+    async (idOverride = factionId, apiKeyOverride = apiKey) => {
       const requestedFactionId = idOverride.trim()
+      const requestedApiKey = apiKeyOverride.trim()
+
+      if (!requestedApiKey) {
+        setError('Enter your Torn API key to begin tracking.')
+        return
+      }
+
       setIsLoading(true)
       setError('')
 
@@ -48,7 +58,10 @@ function Home() {
         const response = await fetch(
           '/api/faction-members?factionId=' +
             encodeURIComponent(requestedFactionId),
-          { cache: 'no-store' },
+          {
+            cache: 'no-store',
+            headers: { 'X-Torn-Api-Key': requestedApiKey },
+          },
         )
         const payload = (await response.json()) as FactionMembersResponse
 
@@ -80,7 +93,7 @@ function Home() {
         setIsLoading(false)
       }
     },
-    [factionId],
+    [apiKey, factionId],
   )
 
   useEffect(() => {
@@ -93,25 +106,35 @@ function Home() {
         : '56833'
     setFactionId(initialFactionId)
     setFactionInput(initialFactionId)
+    const savedApiKey = window.localStorage.getItem('tornintel.apiKey') ?? ''
+    setApiKey(savedApiKey)
+    setApiKeyInput(savedApiKey)
+    setIsPaused(
+      window.localStorage.getItem('tornintel.hospitalPaused') === 'true',
+    )
     setHasInitialized(true)
   }, [])
 
   useEffect(() => {
-    if (!hasInitialized) return
+    if (!hasInitialized || !apiKey || isPaused) return
 
     void refreshTargets()
     const refreshTimer = window.setInterval(() => void refreshTargets(), 30000)
-    const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
 
     return () => {
       window.clearInterval(refreshTimer)
-      window.clearInterval(clockTimer)
     }
-  }, [hasInitialized, refreshTargets])
+  }, [apiKey, hasInitialized, isPaused, refreshTargets])
+
+  useEffect(() => {
+    const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
+    return () => window.clearInterval(clockTimer)
+  }, [])
 
   function trackFaction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextFactionId = factionInput.trim()
+    const nextApiKey = apiKeyInput.trim()
 
     if (!/^\d{1,10}$/.test(nextFactionId)) {
       const message = 'Enter a numeric Torn faction ID.'
@@ -122,7 +145,29 @@ function Home() {
       return
     }
 
-    void refreshTargets(nextFactionId)
+    if (!nextApiKey) {
+      setError('Enter your Torn API key to begin tracking.')
+      return
+    }
+
+    window.localStorage.setItem('tornintel.apiKey', nextApiKey)
+    const factionChanged = nextFactionId !== factionId
+    const apiKeyChanged = nextApiKey !== apiKey
+    setFactionId(nextFactionId)
+    setApiKey(nextApiKey)
+    setError('')
+    if (!isPaused && !factionChanged && !apiKeyChanged) {
+      void refreshTargets(nextFactionId, nextApiKey)
+    }
+  }
+
+  function togglePause() {
+    const nextIsPaused = !isPaused
+    setIsPaused(nextIsPaused)
+    window.localStorage.setItem(
+      'tornintel.hospitalPaused',
+      String(nextIsPaused),
+    )
   }
 
   const visibleTargets = useMemo(
@@ -233,8 +278,19 @@ function Home() {
                 onChange={(event) => setFactionInput(event.target.value)}
                 placeholder="Faction ID"
               />
+              <label className="sr-only" htmlFor="torn-api-key">
+                Torn API key
+              </label>
+              <input
+                id="torn-api-key"
+                type="password"
+                autoComplete="off"
+                value={apiKeyInput}
+                onChange={(event) => setApiKeyInput(event.target.value)}
+                placeholder="Your Torn API key"
+              />
               <button type="submit" disabled={isLoading}>
-                Track
+                Save & track
               </button>
             </form>
           </div>
@@ -244,9 +300,12 @@ function Home() {
             <button
               onClick={() => void refreshTargets()}
               className="refresh-button"
-              disabled={isLoading}
+              disabled={isLoading || isPaused || !apiKey}
             >
               <span>&#8635;</span> {isLoading ? 'Refreshing' : 'Refresh'}
+            </button>
+            <button onClick={togglePause} className="pause-button">
+              {isPaused ? 'Resume tracker' : 'Pause tracker'}
             </button>
           </div>
         </div>
@@ -299,6 +358,7 @@ function Home() {
             <button
               className="add-button"
               onClick={() => void refreshTargets()}
+              disabled={isLoading || isPaused || !apiKey}
             >
               <span>&#8635;</span> Sync now
             </button>
@@ -362,12 +422,17 @@ function Home() {
             <span>
               Showing {visibleTargets.length} of {targets.length} members
             </span>
-            <span>Auto-refreshes every 30 seconds</span>
+            <span>
+              {isPaused ? 'Tracking paused' : 'Auto-refreshes every 30 seconds'}
+            </span>
           </div>
         </section>
         <footer className="footer-note">
           <span className="shield">&#10003;</span> Data comes directly from Torn
-          and is refreshed automatically every 30 seconds.
+          and{' '}
+          {isPaused
+            ? 'tracking is paused.'
+            : 'is refreshed automatically every 30 seconds.'}
         </footer>
       </section>
     </main>

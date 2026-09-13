@@ -23,6 +23,15 @@ type FactionMembersResponse = {
   error?: string
 }
 
+type UserProfile = {
+  id: number
+  name: string
+  level: number
+  factionName: string
+}
+
+type UserResponse = { user?: UserProfile; error?: string }
+
 const filters = ['All targets', 'In hospital', 'Ready', 'Traveling'] as const
 
 function Home() {
@@ -37,9 +46,48 @@ function Home() {
   const [factionId, setFactionId] = useState('')
   const [factionInput, setFactionInput] = useState('')
   const [apiKey, setApiKey] = useState('')
-  const [apiKeyInput, setApiKeyInput] = useState('')
   const [isPaused, setIsPaused] = useState(false)
   const [hasInitialized, setHasInitialized] = useState(false)
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [authenticationError, setAuthenticationError] = useState('')
+
+  const authenticate = useCallback(async (key: string) => {
+    const requestedApiKey = key.trim()
+    if (!requestedApiKey) {
+      setAuthenticationError('Enter a Torn public API key to continue.')
+      return false
+    }
+
+    setIsAuthenticating(true)
+    setAuthenticationError('')
+    try {
+      const response = await fetch('/api/user', {
+        cache: 'no-store',
+        headers: { 'X-Torn-Api-Key': requestedApiKey },
+      })
+      const payload = (await response.json()) as UserResponse
+      if (!response.ok || !payload.user || payload.error) {
+        throw new Error(
+          payload.error ?? 'Unable to verify your Torn public API key.',
+        )
+      }
+
+      window.localStorage.setItem('tornintel.apiKey', requestedApiKey)
+      setApiKey(requestedApiKey)
+      setUser(payload.user)
+      return true
+    } catch (requestError) {
+      setAuthenticationError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to verify your Torn public API key.',
+      )
+      return false
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }, [])
 
   const refreshTargets = useCallback(
     async (idOverride = factionId, apiKeyOverride = apiKey) => {
@@ -107,16 +155,15 @@ function Home() {
     setFactionId(initialFactionId)
     setFactionInput(initialFactionId)
     const savedApiKey = window.localStorage.getItem('tornintel.apiKey') ?? ''
-    setApiKey(savedApiKey)
-    setApiKeyInput(savedApiKey)
     setIsPaused(
       window.localStorage.getItem('tornintel.hospitalPaused') === 'true',
     )
     setHasInitialized(true)
-  }, [])
+    if (savedApiKey) void authenticate(savedApiKey)
+  }, [authenticate])
 
   useEffect(() => {
-    if (!hasInitialized || !apiKey || isPaused) return
+    if (!hasInitialized || !apiKey || !user || isPaused) return
 
     void refreshTargets()
     const refreshTimer = window.setInterval(() => void refreshTargets(), 30000)
@@ -124,7 +171,7 @@ function Home() {
     return () => {
       window.clearInterval(refreshTimer)
     }
-  }, [apiKey, hasInitialized, isPaused, refreshTargets])
+  }, [apiKey, hasInitialized, isPaused, refreshTargets, user])
 
   useEffect(() => {
     const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
@@ -134,7 +181,6 @@ function Home() {
   function trackFaction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextFactionId = factionInput.trim()
-    const nextApiKey = apiKeyInput.trim()
 
     if (!/^\d{1,10}$/.test(nextFactionId)) {
       const message = 'Enter a numeric Torn faction ID.'
@@ -145,19 +191,11 @@ function Home() {
       return
     }
 
-    if (!nextApiKey) {
-      setError('Enter your Torn API key to begin tracking.')
-      return
-    }
-
-    window.localStorage.setItem('tornintel.apiKey', nextApiKey)
     const factionChanged = nextFactionId !== factionId
-    const apiKeyChanged = nextApiKey !== apiKey
     setFactionId(nextFactionId)
-    setApiKey(nextApiKey)
     setError('')
-    if (!isPaused && !factionChanged && !apiKeyChanged) {
-      void refreshTargets(nextFactionId, nextApiKey)
+    if (!isPaused && !factionChanged) {
+      void refreshTargets(nextFactionId)
     }
   }
 
@@ -199,6 +237,20 @@ function Home() {
     target.lastSeen.includes('0 minutes'),
   ).length
 
+  if (!hasInitialized || (isAuthenticating && !user)) {
+    return <ApiKeyGate isLoading />
+  }
+
+  if (!user) {
+    return (
+      <ApiKeyGate
+        error={authenticationError}
+        isLoading={isAuthenticating}
+        onSubmit={authenticate}
+      />
+    )
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -226,14 +278,16 @@ function Home() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-label">WORKSPACE</div>
-          <a className="nav-item" href="#settings">
+          <a className="nav-item" href="/settings">
             <span className="nav-icon">*</span> Settings
           </a>
           <div className="profile">
-            <div className="avatar">A</div>
+            <div className="avatar">{user.name.charAt(0)}</div>
             <div>
-              <strong>Arcadia</strong>
-              <span>Faction officer</span>
+              <strong>{user.name}</strong>
+              <span>
+                Level {user.level} · {user.factionName}
+              </span>
             </div>
             <span className="profile-more">...</span>
           </div>
@@ -278,19 +332,8 @@ function Home() {
                 onChange={(event) => setFactionInput(event.target.value)}
                 placeholder="Faction ID"
               />
-              <label className="sr-only" htmlFor="torn-api-key">
-                Torn API key
-              </label>
-              <input
-                id="torn-api-key"
-                type="password"
-                autoComplete="off"
-                value={apiKeyInput}
-                onChange={(event) => setApiKeyInput(event.target.value)}
-                placeholder="Your Torn API key"
-              />
               <button type="submit" disabled={isLoading}>
-                Save & track
+                Track
               </button>
             </form>
           </div>
@@ -305,7 +348,9 @@ function Home() {
               <span>&#8635;</span> {isLoading ? 'Refreshing' : 'Refresh'}
             </button>
             <button onClick={togglePause} className="pause-button">
-              {isPaused ? 'Resume tracker' : 'Pause tracker'}
+              {isPaused
+                ? 'Resume hospital tracking'
+                : 'Pause hospital tracking'}
             </button>
           </div>
         </div>
@@ -423,7 +468,9 @@ function Home() {
               Showing {visibleTargets.length} of {targets.length} members
             </span>
             <span>
-              {isPaused ? 'Tracking paused' : 'Auto-refreshes every 30 seconds'}
+              {isPaused
+                ? 'Hospital tracking paused'
+                : 'Auto-refreshes every 30 seconds'}
             </span>
           </div>
         </section>
@@ -431,9 +478,57 @@ function Home() {
           <span className="shield">&#10003;</span> Data comes directly from Torn
           and{' '}
           {isPaused
-            ? 'tracking is paused.'
+            ? 'War hospital tracking is paused.'
             : 'is refreshed automatically every 30 seconds.'}
         </footer>
+      </section>
+    </main>
+  )
+}
+
+function ApiKeyGate({
+  error = '',
+  isLoading = false,
+  onSubmit,
+}: {
+  error?: string
+  isLoading?: boolean
+  onSubmit?: (apiKey: string) => Promise<boolean>
+}) {
+  return (
+    <main className="api-key-gate">
+      <section className="api-key-card">
+        <div className="brand">
+          <span className="brand-mark">TI</span>
+          <span>tornintel</span>
+        </div>
+        <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
+        <p>
+          Enter a Torn public API key to use tornintel. It stays in this browser
+          and is used only for your requests.
+        </p>
+        {!isLoading && onSubmit && (
+          <form
+            className="api-key-login"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const formData = new FormData(event.currentTarget)
+              void onSubmit(String(formData.get('apiKey') ?? ''))
+            }}
+          >
+            <label htmlFor="login-api-key">Torn public API key</label>
+            <input
+              id="login-api-key"
+              name="apiKey"
+              type="password"
+              autoComplete="off"
+              autoFocus
+              placeholder="Paste your public API key"
+            />
+            {error && <p className="login-error">{error}</p>}
+            <button type="submit">Connect</button>
+          </form>
+        )}
       </section>
     </main>
   )

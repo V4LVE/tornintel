@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ApiFactionMembersRouteImport } from './routes/api/faction-members'
+import { Route as ApiUserRouteImport } from './routes/api/user'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -18,9 +20,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFactionMembersRoute = ApiFactionMembersRouteImport.update({
   id: '/api/faction-members',
   path: '/api/faction-members',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUserRoute = ApiUserRouteImport.update({
+  id: '/api/user',
+  path: '/api/user',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -31,31 +43,46 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
+  '/api/user': typeof ApiUserRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
+  '/api/user': typeof ApiUserRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
+  '/api/user': typeof ApiUserRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/faction-members' | '/api/auth/$'
+  fullPaths:
+    '/' | '/settings' | '/api/faction-members' | '/api/user' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/faction-members' | '/api/auth/$'
-  id: '__root__' | '/' | '/api/faction-members' | '/api/auth/$'
+  to: '/' | '/settings' | '/api/faction-members' | '/api/user' | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/settings'
+    | '/api/faction-members'
+    | '/api/user'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRoute: typeof SettingsRoute
   ApiFactionMembersRoute: typeof ApiFactionMembersRoute
+  ApiUserRoute: typeof ApiUserRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -68,11 +95,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/faction-members': {
       id: '/api/faction-members'
       path: '/api/faction-members'
       fullPath: '/api/faction-members'
       preLoaderRoute: typeof ApiFactionMembersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/user': {
+      id: '/api/user'
+      path: '/api/user'
+      fullPath: '/api/user'
+      preLoaderRoute: typeof ApiUserRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -87,7 +128,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SettingsRoute: SettingsRoute,
   ApiFactionMembersRoute: ApiFactionMembersRoute,
+  ApiUserRoute: ApiUserRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

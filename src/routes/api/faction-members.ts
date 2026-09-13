@@ -19,14 +19,13 @@ type TornFactionResponse = {
   members?: Record<string, TornMember>
   error?: { error: string; code: number }
 }
-const apiKeyTemp = "fj4EeirVqbVlLvHU"
 const THIRTY_MINUTES = 30 * 60 * 1000
 
 export const Route = createFileRoute('/api/faction-members')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const apiKey = apiKeyTemp || process.env.TORN_API_KEY
+        const apiKey = request.headers.get('x-torn-api-key')?.trim()
         const requestedFactionId = new URL(request.url).searchParams.get(
           'factionId',
         )
@@ -45,8 +44,8 @@ export const Route = createFileRoute('/api/faction-members')({
 
         if (!apiKey) {
           return Response.json(
-            { error: 'Torn API key has not been configured.' },
-            { status: 500 },
+            { error: 'Enter your Torn API key to begin tracking.' },
+            { status: 401 },
           )
         }
 

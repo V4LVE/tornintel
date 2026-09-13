@@ -23,6 +23,15 @@ type FactionMembersResponse = {
   error?: string
 }
 
+type UserProfile = {
+  id: number
+  name: string
+  level: number
+  factionName: string
+}
+
+type UserResponse = { user?: UserProfile; error?: string }
+
 const filters = ['All targets', 'In hospital', 'Ready', 'Traveling'] as const
 
 function Home() {
@@ -32,15 +41,64 @@ function Home() {
   const [factionName, setFactionName] = useState('Enemy faction')
   const [synced, setSynced] = useState('Waiting for data')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [clock, setClock] = useState(0)
   const [factionId, setFactionId] = useState('')
   const [factionInput, setFactionInput] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [isPaused, setIsPaused] = useState(false)
   const [hasInitialized, setHasInitialized] = useState(false)
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [authenticationError, setAuthenticationError] = useState('')
+
+  const authenticate = useCallback(async (key: string) => {
+    const requestedApiKey = key.trim()
+    if (!requestedApiKey) {
+      setAuthenticationError('Enter a Torn public API key to continue.')
+      return false
+    }
+
+    setIsAuthenticating(true)
+    setAuthenticationError('')
+    try {
+      const response = await fetch('/api/user', {
+        cache: 'no-store',
+        headers: { 'X-Torn-Api-Key': requestedApiKey },
+      })
+      const payload = (await response.json()) as UserResponse
+      if (!response.ok || !payload.user || payload.error) {
+        throw new Error(
+          payload.error ?? 'Unable to verify your Torn public API key.',
+        )
+      }
+
+      window.localStorage.setItem('tornintel.apiKey', requestedApiKey)
+      setApiKey(requestedApiKey)
+      setUser(payload.user)
+      return true
+    } catch (requestError) {
+      setAuthenticationError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to verify your Torn public API key.',
+      )
+      return false
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }, [])
 
   const refreshTargets = useCallback(
-    async (idOverride = factionId) => {
+    async (idOverride = factionId, apiKeyOverride = apiKey) => {
       const requestedFactionId = idOverride.trim()
+      const requestedApiKey = apiKeyOverride.trim()
+
+      if (!requestedApiKey) {
+        setError('Enter your Torn API key to begin tracking.')
+        return
+      }
+
       setIsLoading(true)
       setError('')
 
@@ -48,7 +106,10 @@ function Home() {
         const response = await fetch(
           '/api/faction-members?factionId=' +
             encodeURIComponent(requestedFactionId),
-          { cache: 'no-store' },
+          {
+            cache: 'no-store',
+            headers: { 'X-Torn-Api-Key': requestedApiKey },
+          },
         )
         const payload = (await response.json()) as FactionMembersResponse
 
@@ -80,7 +141,7 @@ function Home() {
         setIsLoading(false)
       }
     },
-    [factionId],
+    [apiKey, factionId],
   )
 
   useEffect(() => {
@@ -93,21 +154,29 @@ function Home() {
         : '56833'
     setFactionId(initialFactionId)
     setFactionInput(initialFactionId)
+    const savedApiKey = window.localStorage.getItem('tornintel.apiKey') ?? ''
+    setIsPaused(
+      window.localStorage.getItem('tornintel.hospitalPaused') === 'true',
+    )
     setHasInitialized(true)
-  }, [])
+    if (savedApiKey) void authenticate(savedApiKey)
+  }, [authenticate])
 
   useEffect(() => {
-    if (!hasInitialized) return
+    if (!hasInitialized || !apiKey || !user || isPaused) return
 
     void refreshTargets()
     const refreshTimer = window.setInterval(() => void refreshTargets(), 30000)
-    const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
 
     return () => {
       window.clearInterval(refreshTimer)
-      window.clearInterval(clockTimer)
     }
-  }, [hasInitialized, refreshTargets])
+  }, [apiKey, hasInitialized, isPaused, refreshTargets, user])
+
+  useEffect(() => {
+    const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
+    return () => window.clearInterval(clockTimer)
+  }, [])
 
   function trackFaction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -122,7 +191,21 @@ function Home() {
       return
     }
 
-    void refreshTargets(nextFactionId)
+    const factionChanged = nextFactionId !== factionId
+    setFactionId(nextFactionId)
+    setError('')
+    if (!isPaused && !factionChanged) {
+      void refreshTargets(nextFactionId)
+    }
+  }
+
+  function togglePause() {
+    const nextIsPaused = !isPaused
+    setIsPaused(nextIsPaused)
+    window.localStorage.setItem(
+      'tornintel.hospitalPaused',
+      String(nextIsPaused),
+    )
   }
 
   const visibleTargets = useMemo(
@@ -154,6 +237,20 @@ function Home() {
     target.lastSeen.includes('0 minutes'),
   ).length
 
+  if (!hasInitialized || (isAuthenticating && !user)) {
+    return <ApiKeyGate isLoading />
+  }
+
+  if (!user) {
+    return (
+      <ApiKeyGate
+        error={authenticationError}
+        isLoading={isAuthenticating}
+        onSubmit={authenticate}
+      />
+    )
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -181,14 +278,16 @@ function Home() {
         </nav>
         <div className="sidebar-bottom">
           <div className="workspace-label">WORKSPACE</div>
-          <a className="nav-item" href="#settings">
+          <a className="nav-item" href="/settings">
             <span className="nav-icon">*</span> Settings
           </a>
           <div className="profile">
-            <div className="avatar">A</div>
+            <div className="avatar">{user.name.charAt(0)}</div>
             <div>
-              <strong>Arcadia</strong>
-              <span>Faction officer</span>
+              <strong>{user.name}</strong>
+              <span>
+                Level {user.level} · {user.factionName}
+              </span>
             </div>
             <span className="profile-more">...</span>
           </div>
@@ -244,9 +343,20 @@ function Home() {
             <button
               onClick={() => void refreshTargets()}
               className="refresh-button"
-              disabled={isLoading}
+              disabled={isLoading || isPaused || !apiKey}
             >
               <span>&#8635;</span> {isLoading ? 'Refreshing' : 'Refresh'}
+            </button>
+            <button
+              onClick={togglePause}
+              className={isPaused ? 'pause-button paused' : 'pause-button'}
+              aria-pressed={isPaused}
+              title="Pause or resume War Hospital API polling"
+            >
+              <span aria-hidden="true">{isPaused ? '▶' : 'Ⅱ'}</span>
+              {isPaused
+                ? 'Resume hospital tracking'
+                : 'Pause hospital tracking'}
             </button>
           </div>
         </div>
@@ -299,6 +409,7 @@ function Home() {
             <button
               className="add-button"
               onClick={() => void refreshTargets()}
+              disabled={isLoading || isPaused || !apiKey}
             >
               <span>&#8635;</span> Sync now
             </button>
@@ -362,13 +473,68 @@ function Home() {
             <span>
               Showing {visibleTargets.length} of {targets.length} members
             </span>
-            <span>Auto-refreshes every 30 seconds</span>
+            <span>
+              {isPaused
+                ? 'Hospital tracking paused'
+                : 'Auto-refreshes every 30 seconds'}
+            </span>
           </div>
         </section>
         <footer className="footer-note">
           <span className="shield">&#10003;</span> Data comes directly from Torn
-          and is refreshed automatically every 30 seconds.
+          and{' '}
+          {isPaused
+            ? 'War hospital tracking is paused.'
+            : 'is refreshed automatically every 30 seconds.'}
         </footer>
+      </section>
+    </main>
+  )
+}
+
+function ApiKeyGate({
+  error = '',
+  isLoading = false,
+  onSubmit,
+}: {
+  error?: string
+  isLoading?: boolean
+  onSubmit?: (apiKey: string) => Promise<boolean>
+}) {
+  return (
+    <main className="api-key-gate">
+      <section className="api-key-card">
+        <div className="brand">
+          <span className="brand-mark">TI</span>
+          <span>tornintel</span>
+        </div>
+        <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
+        <p>
+          Enter a Torn public API key to use tornintel. It stays in this browser
+          and is used only for your requests.
+        </p>
+        {!isLoading && onSubmit && (
+          <form
+            className="api-key-login"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const formData = new FormData(event.currentTarget)
+              void onSubmit(String(formData.get('apiKey') ?? ''))
+            }}
+          >
+            <label htmlFor="login-api-key">Torn public API key</label>
+            <input
+              id="login-api-key"
+              name="apiKey"
+              type="password"
+              autoComplete="off"
+              autoFocus
+              placeholder="Paste your public API key"
+            />
+            {error && <p className="login-error">{error}</p>}
+            <button type="submit">Connect</button>
+          </form>
+        )}
       </section>
     </main>
   )

@@ -658,6 +658,23 @@ td {
 .last-seen {
   color: #71828d;
 }
+.battle-stats {
+  display: grid;
+  gap: 3px;
+  white-space: nowrap;
+}
+.battle-stats strong {
+  color: #dfe6e8;
+  font-size: 11px;
+}
+.battle-stats span,
+.battle-stats-unavailable {
+  color: #71828d;
+  font-size: 9px;
+}
+.battle-stats-unavailable {
+  font-style: italic;
+}
 .priority {
   font-size: 10px;
   font-weight: 700;

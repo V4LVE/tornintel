@@ -273,6 +273,9 @@ function Home() {
             <span className="nav-icon">&#8594;</span> Chain tracker
             <span className="soon">Soon</span>
           </a>
+          <a className="nav-item" href="/payouts">
+            <span className="nav-icon">$</span> War payout
+          </a>
           <a className="nav-item" href="#intel">
             <span className="nav-icon">i</span> Intel reports
             <span className="soon">Soon</span>

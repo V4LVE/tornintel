@@ -658,6 +658,23 @@ td {
 .last-seen {
   color: #71828d;
 }
+.battle-stats {
+  display: grid;
+  gap: 3px;
+  white-space: nowrap;
+}
+.battle-stats strong {
+  color: #dfe6e8;
+  font-size: 11px;
+}
+.battle-stats span,
+.battle-stats-unavailable {
+  color: #71828d;
+  font-size: 9px;
+}
+.battle-stats-unavailable {
+  font-style: italic;
+}
 .priority {
   font-size: 10px;
   font-weight: 700;
@@ -786,6 +803,57 @@ td {
 .settings-page {
   min-height: 100vh;
   background: #0d151d;
+}
+.payout-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 45px 28px;
+}
+.payout-page h1 {
+  margin: 20px 0 8px;
+}
+.payout-page > p {
+  color: #84939e;
+}
+.payout-inputs,
+.payout-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 26px 0;
+}
+.payout-inputs label,
+.payout-summary span {
+  display: grid;
+  gap: 7px;
+  color: #82929d;
+  font-size: 11px;
+}
+.payout-inputs input {
+  width: 180px;
+  height: 36px;
+  background: #111d26;
+  border: 1px solid #31414b;
+  border-radius: 4px;
+  color: #e8edef;
+  padding: 0 10px;
+}
+.payout-summary span {
+  min-width: 150px;
+  padding: 16px;
+  border: 1px solid #293741;
+  border-radius: 7px;
+  background: #15222c;
+}
+.payout-summary b {
+  color: #f0f4f5;
+  font-size: 17px;
+}
+.payout-table {
+  min-width: 600px;
+  background: #121e27;
+  border: 1px solid #293741;
+  border-radius: 7px;
 }
 .settings-topbar {
   height: 72px;

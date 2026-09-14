@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -14,6 +15,7 @@ type Target = {
   reason: string
   lastSeen: string
   priority: 'High' | 'Medium' | 'Low'
+  battleStats: BattleStatsEstimate
 }
 
 type FactionMembersResponse = {
@@ -55,7 +57,7 @@ function Home() {
   const authenticate = useCallback(async (key: string) => {
     const requestedApiKey = key.trim()
     if (!requestedApiKey) {
-      setAuthenticationError('Enter a Torn public API key to continue.')
+      setAuthenticationError('Enter a Torn API key to continue.')
       return false
     }
 
@@ -271,6 +273,9 @@ function Home() {
             <span className="nav-icon">&#8594;</span> Chain tracker
             <span className="soon">Soon</span>
           </a>
+          <a className="nav-item" href="/payouts">
+            <span className="nav-icon">$</span> War payout
+          </a>
           <a className="nav-item" href="#intel">
             <span className="nav-icon">i</span> Intel reports
             <span className="soon">Soon</span>
@@ -447,6 +452,7 @@ function Home() {
                   <th>RELEASES IN</th>
                   <th>REASON</th>
                   <th>LAST SEEN</th>
+                  <th>EST. TBS</th>
                   <th>PRIORITY</th>
                   <th>
                     <span className="sr-only">Action</span>
@@ -510,8 +516,9 @@ function ApiKeyGate({
         </div>
         <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
         <p>
-          Enter a Torn public API key to use tornintel. It stays in this browser
-          and is used only for your requests.
+          Enter a Torn API key to use tornintel. A Limited key also lets us use
+          your recent Fair Fight history for battle-stat estimates. It stays in
+          this browser and is used only for your requests.
         </p>
         {!isLoading && onSubmit && (
           <form
@@ -522,14 +529,14 @@ function ApiKeyGate({
               void onSubmit(String(formData.get('apiKey') ?? ''))
             }}
           >
-            <label htmlFor="login-api-key">Torn public API key</label>
+            <label htmlFor="login-api-key">Torn API key</label>
             <input
               id="login-api-key"
               name="apiKey"
               type="password"
               autoComplete="off"
               autoFocus
-              placeholder="Paste your public API key"
+              placeholder="Paste a Limited Torn API key"
             />
             {error && <p className="login-error">{error}</p>}
             <button type="submit">Connect</button>
@@ -627,6 +634,9 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
         <span className="last-seen">{target.lastSeen}</span>
       </td>
       <td>
+        <BattleStatsCell estimate={target.battleStats} />
+      </td>
+      <td>
         <span className={priorityClass}>
           <i />
           {target.priority}
@@ -644,6 +654,41 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
       </td>
     </tr>
   )
+}
+
+function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
+  if (estimate.estimate === null) {
+    return (
+      <span className="battle-stats-unavailable" title={estimate.explanation}>
+        No FF history
+      </span>
+    )
+  }
+
+  const range = estimate.sources.includes('FALLBACK')
+    ? `~${formatBattleStats(estimate.estimate)}`
+    : estimate.upperBound === null
+      ? `${formatBattleStats(estimate.lowerBound)}+`
+      : estimate.lowerBound === estimate.upperBound
+        ? formatBattleStats(estimate.estimate)
+        : `${formatBattleStats(estimate.lowerBound ?? 0)}–${formatBattleStats(estimate.upperBound)}`
+  return (
+    <div className="battle-stats" title={estimate.explanation}>
+      <strong>{range}</strong>
+      <span>
+        {estimate.bss === null ? '' : `BSS ${Math.round(estimate.bss)} · `}
+        {estimate.confidenceLevel.replace('_', ' ')} ·{' '}
+        {estimate.sources.join(' + ')}
+      </span>
+    </div>
+  )
+}
+
+function formatBattleStats(value: number) {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}b`
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
+  return Math.round(value).toLocaleString()
 }
 
 function formatRelease(releaseAt: number, now: number) {

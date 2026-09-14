@@ -23,7 +23,7 @@ function Settings() {
   const verifyKey = useCallback(async (key: string) => {
     const publicApiKey = key.trim()
     if (!publicApiKey) {
-      setError('Enter a Torn public API key to continue.')
+      setError('Enter a Torn API key to continue.')
       return false
     }
 
@@ -96,16 +96,16 @@ function Settings() {
             <span>tornintel</span>
           </div>
           <h1>Connect to Torn</h1>
-          <p>Enter a Torn public API key to access your settings.</p>
+          <p>Enter a Torn API key to access your settings.</p>
           <form className="api-key-login" onSubmit={submitKey}>
-            <label htmlFor="settings-login-api-key">Torn public API key</label>
+            <label htmlFor="settings-login-api-key">Torn API key</label>
             <input
               id="settings-login-api-key"
               name="apiKey"
               type="password"
               autoComplete="off"
               autoFocus
-              placeholder="Paste your public API key"
+              placeholder="Paste a Limited Torn API key"
             />
             {error && <p className="login-error">{error}</p>}
             <button type="submit">Connect</button>
@@ -130,19 +130,20 @@ function Settings() {
         <div className="settings-heading">
           <span>WORKSPACE</span>
           <h1>Settings</h1>
-          <p>Manage the public Torn API key used from this browser.</p>
+          <p>Manage the Torn API key used from this browser.</p>
         </div>
         <section className="panel">
           <div className="panel-header">
             <div>
               <h2>Torn API key</h2>
               <p>
-                Only use a public API key. It is stored locally in this browser.
+                A Limited key enables Fair Fight estimates. It is stored locally
+                in this browser.
               </p>
             </div>
           </div>
           <form className="api-key-settings" onSubmit={submitKey}>
-            <label htmlFor="settings-api-key">Public API key</label>
+            <label htmlFor="settings-api-key">Torn API key</label>
             <input
               id="settings-api-key"
               name="apiKey"
@@ -163,7 +164,7 @@ function Settings() {
           <div className="panel-header">
             <div>
               <h2>Connected account</h2>
-              <p>Verified with your current public API key.</p>
+              <p>Verified with your current Torn API key.</p>
             </div>
           </div>
           <div className="connected-user">

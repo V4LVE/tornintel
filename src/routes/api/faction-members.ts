@@ -1,4 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
+import {
+  calculateBattleStatScore,
+  estimateBattleStats,
+} from '#/lib/battle-stats/estimator'
+import type {
+  BattleStats,
+  FairFightObservation,
+} from '#/lib/battle-stats/estimator'
 
 type TornMember = {
   name: string
@@ -19,7 +27,33 @@ type TornFactionResponse = {
   members?: Record<string, TornMember>
   error?: { error: string; code: number }
 }
+
+type TornBattleStat = number | { value?: number }
+
+type TornAttack = {
+  attacker_id?: number
+  defender_id?: number
+  timestamp_ended?: number
+  timestamp_started?: number
+  modifiers?: { fair_fight?: number }
+}
+
+type TornCombatResponse = {
+  battlestats?: {
+    strength?: TornBattleStat
+    speed?: TornBattleStat
+    defense?: TornBattleStat
+    dexterity?: TornBattleStat
+  }
+  attacks?: Record<string, TornAttack> | TornAttack[]
+  error?: { error: string; code: number }
+}
 const THIRTY_MINUTES = 30 * 60 * 1000
+const CURRENT_ATTACKER_STATS_WINDOW = 14 * 24 * 60 * 60 * 1000
+const PROFILE_CACHE_TTL = 6 * 60 * 60 * 1000
+const PROFILE_LOOKUPS_PER_REFRESH = 10
+const profileAgeCache = new Map<string, { age: number; fetchedAt: number }>()
+const medalCountCache = new Map<string, { count: number; fetchedAt: number }>()
 
 export const Route = createFileRoute('/api/faction-members')({
   server: {
@@ -73,8 +107,23 @@ export const Route = createFileRoute('/api/faction-members')({
           }
 
           const now = Date.now()
+          const fairFightByTarget = await loadFairFightEvidence(apiKey, now)
+          const ages = await loadProfileAges(
+            Object.keys(faction.members ?? {}),
+            apiKey,
+            now,
+          )
+          await loadMedalCounts(Object.keys(faction.members ?? {}), apiKey, now)
           const members = Object.entries(faction.members ?? {})
-            .map(([id, member]) => formatMember(id, member, now))
+            .map(([id, member]) =>
+              formatMember(
+                id,
+                member,
+                now,
+                fairFightByTarget.get(id) ?? [],
+                ages.get(id),
+              ),
+            )
             .sort((left, right) => {
               const statusOrder = { Ready: 0, 'In hospital': 1, Traveling: 2 }
               const orderDifference =
@@ -108,7 +157,13 @@ export const Route = createFileRoute('/api/faction-members')({
   },
 })
 
-function formatMember(id: string, member: TornMember, now: number) {
+function formatMember(
+  id: string,
+  member: TornMember,
+  now: number,
+  fairFightObservations: FairFightObservation[],
+  age?: number,
+) {
   const state = member.status.state ?? 'Unknown'
   const releaseAt = (member.status.until ?? 0) * 1000
   const status =
@@ -138,7 +193,142 @@ function formatMember(id: string, member: TornMember, now: number) {
           : status === 'In hospital'
             ? 'Medium'
             : 'Low',
+    battleStats: estimateBattleStats({
+      now,
+      fairFightObservations,
+      weakMetadata: { age, level: member.level },
+    }),
   } as const
+}
+
+async function loadProfileAges(ids: string[], apiKey: string, now: number) {
+  const missing = ids.filter((id) => {
+    const cached = profileAgeCache.get(id)
+    return !cached || now - cached.fetchedAt > PROFILE_CACHE_TTL
+  })
+  await Promise.all(
+    missing.slice(0, PROFILE_LOOKUPS_PER_REFRESH).map(async (id) => {
+      const url = new URL(`https://api.torn.com/v2/user/${id}/profile`)
+      url.searchParams.set('key', apiKey)
+      try {
+        const response = await fetch(url, { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = (await response.json()) as {
+          profile?: { age?: number }
+          age?: number
+        }
+        const age = payload.profile?.age ?? payload.age
+        if (typeof age === 'number' && age > 0) {
+          profileAgeCache.set(id, { age, fetchedAt: now })
+        }
+      } catch {
+        // Profile enrichment is optional and must not interrupt hospital data.
+      }
+    }),
+  )
+  return new Map(
+    ids.flatMap((id) => {
+      const cached = profileAgeCache.get(id)
+      return cached ? [[id, cached.age] as const] : []
+    }),
+  )
+}
+
+async function loadMedalCounts(ids: string[], apiKey: string, now: number) {
+  const missing = ids.filter((id) => {
+    const cached = medalCountCache.get(id)
+    return !cached || now - cached.fetchedAt > PROFILE_CACHE_TTL
+  })
+  await Promise.all(
+    missing.slice(0, PROFILE_LOOKUPS_PER_REFRESH).map(async (id) => {
+      const url = new URL(`https://api.torn.com/v2/user/${id}/medals`)
+      url.searchParams.set('key', apiKey)
+      try {
+        const response = await fetch(url, { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = (await response.json()) as { medals?: unknown[] }
+        if (Array.isArray(payload.medals)) {
+          medalCountCache.set(id, {
+            count: payload.medals.length,
+            fetchedAt: now,
+          })
+        }
+      } catch {
+        // Medal enrichment is optional and must not interrupt hospital data.
+      }
+    }),
+  )
+}
+
+async function loadFairFightEvidence(apiKey: string, now: number) {
+  // v1 is intentionally used here because the application already uses it and
+  // it lets a limited key request its own stats and detailed attacks together.
+  const url = new URL('https://api.torn.com/user/')
+  url.searchParams.set('selections', 'battlestats,attacks')
+  url.searchParams.set('key', apiKey)
+
+  try {
+    const response = await fetch(url, { cache: 'no-store' })
+    if (!response.ok) return new Map<string, FairFightObservation[]>()
+    const combat = (await response.json()) as TornCombatResponse
+    if (combat.error) return new Map<string, FairFightObservation[]>()
+
+    const stats = parseBattleStats(combat.battlestats)
+    if (!stats) return new Map<string, FairFightObservation[]>()
+    const attackerBss = calculateBattleStatScore(stats)
+    const attacks = Array.isArray(combat.attacks)
+      ? combat.attacks
+      : Object.values(combat.attacks ?? {})
+    const observations = new Map<string, FairFightObservation[]>()
+    for (const attack of attacks) {
+      const targetId = attack.defender_id
+      const fairFight = attack.modifiers?.fair_fight
+      const timestamp =
+        (attack.timestamp_ended ?? attack.timestamp_started ?? now / 1000) *
+        1000
+      // We only know the attacker's current stats, so do not reinterpret old
+      // fights as though those stats were known at the time of the attack.
+      if (timestamp < now - CURRENT_ATTACKER_STATS_WINDOW) continue
+      if (!targetId || !fairFight) continue
+      const targetObservations = observations.get(String(targetId)) ?? []
+      targetObservations.push({
+        targetId: String(targetId),
+        attackerId: String(attack.attacker_id ?? 'self'),
+        attackerBss,
+        fairFight,
+        timestamp,
+        attackerStatsExact: false,
+      })
+      observations.set(String(targetId), targetObservations)
+    }
+    return observations
+  } catch (error) {
+    console.warn('[tornintel] Could not load optional Fair Fight evidence', {
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return new Map<string, FairFightObservation[]>()
+  }
+}
+
+function parseBattleStats(
+  battlestats: TornCombatResponse['battlestats'],
+): BattleStats | null {
+  if (!battlestats) return null
+  const value = (stat: TornBattleStat | undefined) =>
+    typeof stat === 'number' ? stat : stat?.value
+  const strength = value(battlestats.strength)
+  const speed = value(battlestats.speed)
+  const defense = value(battlestats.defense)
+  const dexterity = value(battlestats.dexterity)
+  if (
+    typeof strength !== 'number' ||
+    typeof speed !== 'number' ||
+    typeof defense !== 'number' ||
+    typeof dexterity !== 'number'
+  ) {
+    return null
+  }
+  return { strength, speed, defense, dexterity }
 }
 
 function stripHtml(value?: string) {

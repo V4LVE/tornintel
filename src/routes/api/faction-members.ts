@@ -12,7 +12,7 @@ import type {
 type TornMember = {
   name: string
   level: number
-  last_action?: { relative?: string; status?: string }
+  last_action?: { relative?: string | number; status?: string }
   status: {
     description?: string
     details?: string
@@ -177,6 +177,8 @@ function formatMember(
         ? 'Ready'
         : 'Traveling'
   const remaining = releaseAt - now
+  const lastSeen = member.last_action?.relative ?? member.last_action?.status
+  const hospitalRecommended = status === 'Ready' && isOnline(lastSeen)
 
   return {
     id,
@@ -187,8 +189,8 @@ function formatMember(
     releaseAt: status === 'In hospital' ? releaseAt : now,
     reason:
       stripHtml(member.status.details) || member.status.description || state,
-    lastSeen:
-      member.last_action?.relative ?? member.last_action?.status ?? 'Unknown',
+    lastSeen: lastSeen === undefined ? 'Unknown' : String(lastSeen),
+    hospitalRecommended,
     priority:
       status === 'Ready'
         ? 'High'
@@ -202,6 +204,14 @@ function formatMember(
       fairFightObservations,
     }),
   } as const
+}
+
+function isOnline(lastSeen: string | number | undefined) {
+  return (
+    lastSeen === 0 ||
+    (typeof lastSeen === 'string' &&
+      /^0\s*(?:minutes?|mins?|m)?(?:\s+ago)?$/i.test(lastSeen.trim()))
+  )
 }
 
 async function loadFairFightEvidence(

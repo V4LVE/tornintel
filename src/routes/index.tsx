@@ -14,6 +14,7 @@ type Target = {
   releaseAt: number
   reason: string
   lastSeen: string
+  hospitalRecommended: boolean
   priority: 'High' | 'Medium' | 'Low'
   battleStats: BattleStatsEstimate
 }
@@ -653,7 +654,12 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
         <span className="reason">{target.reason}</span>
       </td>
       <td>
-        <span className="last-seen">{target.lastSeen}</span>
+        <div className="last-seen">
+          <span>{target.lastSeen}</span>
+          {target.hospitalRecommended && (
+            <span className="hospital-recommended">Hospital recommended</span>
+          )}
+        </div>
       </td>
       <td>
         <BattleStatsCell estimate={target.battleStats} />

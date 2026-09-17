@@ -658,6 +658,19 @@ td {
 .last-seen {
   color: #71828d;
 }
+.hospital-recommended {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  border: 1px solid #ef8167;
+  border-radius: 3px;
+  padding: 2px 4px;
+  color: #ff9b83;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .battle-stats {
   display: grid;
   gap: 3px;

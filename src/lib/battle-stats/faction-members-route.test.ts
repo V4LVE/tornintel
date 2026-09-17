@@ -37,6 +37,7 @@ test('serializes an FF estimate from flat v1 battle stats', async () => {
                 name: 'Target',
                 level: 50,
                 status: { state: 'Okay' },
+                last_action: { relative: 0 },
               },
             },
           }
@@ -64,6 +65,7 @@ test('serializes an FF estimate from flat v1 battle stats', async () => {
     assert.equal(payload.fairFightStatus, 'READY')
     assert.equal(payload.members[0].battleStats.sources[0], 'FAIR_FIGHT')
     assert.ok(payload.members[0].battleStats.estimate > 0)
+    assert.equal(payload.members[0].hospitalRecommended, true)
   } finally {
     globalThis.fetch = originalFetch
   }

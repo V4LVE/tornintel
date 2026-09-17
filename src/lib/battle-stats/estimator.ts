@@ -15,6 +15,10 @@ export type FairFightObservation = {
   targetId: string
   attackerId: string
   attackerBss: number
+  // Set for an incoming attack: the known player was the defender and the
+  // target whose stats we want was the attacker.
+  defenderBss?: number
+  attackerBalanceFactor?: number
   fairFight: number
   timestamp: number
   attackerStatsExact?: boolean
@@ -57,12 +61,15 @@ export type BattleStatsEstimate = {
 }
 
 export const ESTIMATOR_CONFIG = {
-  fairFight: { weakAtOrBelow: 1.01, cappedAtOrAbove: 2.99 },
+  fairFight: { weakAtOrBelow: 1.05, cappedAtOrAbove: 3 },
   recencyHalfLifeDays: 30,
   recentSpyDays: 30,
   outlierRelativeDistance: 0.35,
   minCalibrationSamples: 8,
-  fallbackBalanceFactors: { low: 1, median: 2, high: 4 },
+  // A BSS of 2,736 corresponds to roughly 1.95m total stats in FFScouter's
+  // published example (balance factor ~1.04). Keep the no-attacker fallback
+  // near balanced; live observations use the attacker's actual distribution.
+  fallbackBalanceFactors: { low: 1, median: 1.1, high: 4 },
   metadataPrior: {
     sampleSize: 200,
     intercept: -2.14101736574686,
@@ -123,6 +130,22 @@ export function estimateBssFromFairFight(
     return null
   }
   return (fairFight - 1) * (3 / 8) * attackerBss
+}
+
+export function estimateAttackerBssFromFairFight(
+  fairFight: number,
+  defenderBss: number,
+): number | null {
+  if (
+    !Number.isFinite(fairFight) ||
+    !Number.isFinite(defenderBss) ||
+    defenderBss <= 0 ||
+    fairFight <= ESTIMATOR_CONFIG.fairFight.weakAtOrBelow ||
+    fairFight >= ESTIMATOR_CONFIG.fairFight.cappedAtOrAbove
+  ) {
+    return null
+  }
+  return ((8 / 3) * defenderBss) / (fairFight - 1)
 }
 
 /**
@@ -230,31 +253,6 @@ function newestTimestamp(values: Array<number | undefined>): number | null {
   return valid.length ? Math.max(...valid) : null
 }
 
-function profileEstimateWithinBounds(
-  metadata: WeakMetadata | undefined,
-  lowerBound: number,
-  upperBound: number | null,
-  fairFightCentre?: number,
-): number {
-  const profileEstimate = weakMetadataEstimate(metadata)
-  const centre =
-    fairFightCentre === undefined
-      ? (profileEstimate ??
-        (upperBound === null ? lowerBound : (lowerBound + upperBound) / 2))
-      : profileEstimate === null
-        ? fairFightCentre
-        : Math.exp(
-            0.8 * Math.log(Math.max(1, fairFightCentre)) +
-              0.2 * Math.log(Math.max(1, profileEstimate)),
-          )
-  return Math.round(
-    Math.max(
-      lowerBound,
-      Math.min(centre, upperBound ?? Number.POSITIVE_INFINITY),
-    ),
-  )
-}
-
 export function estimateBattleStats(input: {
   exactStats?: BattleStats
   spy?: SpyEvidence
@@ -321,7 +319,15 @@ export function estimateBattleStats(input: {
   const usable = observations.flatMap((observation) => {
     const bss = observation.top1000Capped
       ? null
-      : estimateBssFromFairFight(observation.fairFight, observation.attackerBss)
+      : observation.defenderBss === undefined
+        ? estimateBssFromFairFight(
+            observation.fairFight,
+            observation.attackerBss,
+          )
+        : estimateAttackerBssFromFairFight(
+            observation.fairFight,
+            observation.defenderBss,
+          )
     return bss === null
       ? []
       : [{ observation, bss, weight: observationWeight(observation, now) }]
@@ -353,6 +359,18 @@ export function estimateBattleStats(input: {
     const spread = percentile(bssValues, 0.9) - percentile(bssValues, 0.1)
     const factors = calibrationFactors(input.calibrationSamples ?? [])
     const mathematicalMinimum = (bss * bss) / 4
+    const attackerFactors = accepted.flatMap(({ observation, weight }) => {
+      const factor = observation.attackerBalanceFactor
+      return factor !== undefined &&
+        Number.isFinite(factor) &&
+        factor >= 1 &&
+        factor <= 4
+        ? [{ value: factor, weight }]
+        : []
+    })
+    const pointFactor = attackerFactors.length
+      ? weightedMedian(attackerFactors)
+      : factors.median
     let lowerBound = mathematicalMinimum * factors.low
     let upperBound = mathematicalMinimum * factors.high
     let rankConstraintUsed = false
@@ -394,11 +412,11 @@ export function estimateBattleStats(input: {
       (evidenceConflict ? ESTIMATOR_CONFIG.confidence.conflictPenalty : 0)
     confidence = Math.round(Math.max(0, Math.min(99, confidence)))
     return {
-      estimate: profileEstimateWithinBounds(
-        input.weakMetadata,
-        lowerBound,
-        upperBound,
-        mathematicalMinimum * factors.median,
+      estimate: Math.round(
+        Math.max(
+          lowerBound,
+          Math.min(mathematicalMinimum * pointFactor, upperBound),
+        ),
       ),
       lowerBound,
       upperBound,
@@ -407,9 +425,6 @@ export function estimateBattleStats(input: {
       confidenceLevel: confidenceLevel(confidence),
       sources: [
         'FAIR_FIGHT',
-        ...(weakMetadataEstimate(input.weakMetadata) !== null
-          ? (['PROFILE'] as const)
-          : []),
         ...(input.spy ? (['SPY'] as const) : []),
         ...(input.rankEvidence ? (['RANK'] as const) : []),
       ],
@@ -418,7 +433,7 @@ export function estimateBattleStats(input: {
         input.spy?.timestamp,
         input.rankEvidence?.timestamp,
       ]),
-      explanation: `Weighted median of ${accepted.length} uncapped Fair Fight observation${accepted.length === 1 ? '' : 's'}, converted from BSS using ${factors.calibrated ? 'calibrated' : 'broad uncalibrated'} stat-distribution factors.${weakMetadataEstimate(input.weakMetadata) === null ? '' : ' Level, age, and available medals modestly adjust the point estimate within that range.'}`,
+      explanation: `Weighted median of ${accepted.length} uncapped Fair Fight observation${accepted.length === 1 ? '' : 's'} gives the target's battle stat score. The total-stat point estimate assumes ${attackerFactors.length ? 'the target has a stat distribution like your own' : factors.calibrated ? 'the calibrated stat distribution' : 'a roughly balanced stat distribution'}; a different build can change the total substantially.`,
       warnings: [
         'Total battle stats depend on stat distribution.',
         ...(!factors.calibrated
@@ -444,7 +459,8 @@ export function estimateBattleStats(input: {
 
   const cappedBounds = observations.reduce(
     (bounds, observation) => {
-      if (observation.top1000Capped) return bounds
+      if (observation.top1000Capped || observation.defenderBss !== undefined)
+        return bounds
       const bssBounds = estimateBssBoundsFromFairFight(
         observation.fairFight,
         observation.attackerBss,
@@ -503,29 +519,20 @@ export function estimateBattleStats(input: {
       ),
     )
     return {
-      estimate: profileEstimateWithinBounds(
-        input.weakMetadata,
-        lowerBound,
-        upperBound,
-      ),
+      estimate: null,
       lowerBound,
       upperBound,
-      bss: constrainedUpperBss ?? constrainedLowerBss,
+      bss: null,
       confidence,
       confidenceLevel: confidenceLevel(confidence),
-      sources: [
-        'FAIR_FIGHT',
-        ...(weakMetadataEstimate(input.weakMetadata) !== null
-          ? (['PROFILE'] as const)
-          : []),
-      ],
+      sources: ['FAIR_FIGHT'],
       newestEvidenceAt: newestTimestamp(
         observations.map((observation) => observation.timestamp),
       ),
       explanation:
         upperBound === null
-          ? `Fair Fight reached Torn's high cap in ${cappedBounds.count} observation${cappedBounds.count === 1 ? '' : 's'}, so it establishes a lower bound. Level, age, and available medals supply only a low-confidence point estimate above that bound.`
-          : `Fair Fight reached Torn's low cap in ${cappedBounds.count} observation${cappedBounds.count === 1 ? '' : 's'}, so it establishes an upper bound. Level, age, and available medals supply only a low-confidence point estimate below that bound.`,
+          ? `Fair Fight reached Torn's high cap in ${cappedBounds.count} observation${cappedBounds.count === 1 ? '' : 's'}. Only a possible lower bound is shown; the exact score and total cannot be recovered.`
+          : `Fair Fight reached Torn's low cap in ${cappedBounds.count} observation${cappedBounds.count === 1 ? '' : 's'}. Only an upper bound is shown; the exact score and total cannot be recovered.`,
       warnings: [
         'Torn caps this Fair Fight score, so the exact battle-stat total cannot be recovered.',
         ...(cappedBounds.lowerBss !== undefined
@@ -541,7 +548,7 @@ export function estimateBattleStats(input: {
       ],
       diagnostics: {
         ...diagnostics,
-        weightedMedianBss: constrainedUpperBss ?? constrainedLowerBss,
+        weightedMedianBss: null,
         bssSpread: null,
         evidenceConflict: boundsConflict,
       },
@@ -641,13 +648,16 @@ export function estimateBattleStats(input: {
     newestEvidenceAt: null,
     explanation:
       weakEstimate === null
-        ? 'No reliable battle-stat evidence has been recorded for this player.'
+        ? 'No usable Fair Fight score has been recorded for this player in your recent attacks or defenses.'
         : hasCalibratedMetadata
           ? 'Age and level were compared with a 200-player calibration dataset; this remains a population estimate, not direct battle-stat evidence.'
           : 'A deliberately broad population prior is shown because no direct evidence is available; level does not reliably predict battle stats.',
-    warnings: [
-      'This is not a level-based battle-stat measurement and should not be used to plan an attack.',
-    ],
+    warnings:
+      weakEstimate === null
+        ? []
+        : [
+            'This is not a level-based battle-stat measurement and should not be used to plan an attack.',
+          ],
     diagnostics,
   }
 }

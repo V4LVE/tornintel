@@ -672,8 +672,17 @@ td {
   color: #71828d;
   font-size: 9px;
 }
+.battle-stats .battle-stats-method {
+  color: #9fc6b5;
+  font-size: 10px;
+}
 .battle-stats-unavailable {
   font-style: italic;
+}
+.ff-evidence-note {
+  margin: 0 20px 12px;
+  color: #e6b77b;
+  font-size: 12px;
 }
 .priority {
   font-size: 10px;

@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   calculateBalanceFactor,
   calculateBattleStatScore,
+  estimateAttackerBssFromFairFight,
   estimateBattleStats,
   estimateBssFromFairFight,
   totalBattleStats,
@@ -27,8 +28,39 @@ test('inverts uncapped Fair Fight and rejects boundary values', () => {
   assert.equal(estimateBssFromFairFight(2, 800), 300)
   assert.equal(estimateBssFromFairFight(1, 800), null)
   assert.equal(estimateBssFromFairFight(1.01, 800), null)
-  assert.equal(estimateBssFromFairFight(2.99, 800), null)
+  assert.equal(estimateBssFromFairFight(1.05, 800), null)
+  assert.ok(estimateBssFromFairFight(2.99, 800))
   assert.equal(estimateBssFromFairFight(3, 800), null)
+})
+
+test('inverts an incoming Fair Fight score to estimate the attacker', () => {
+  assert.ok(
+    Math.abs((estimateAttackerBssFromFairFight(7 / 3, 2_000) ?? 0) - 4_000) <
+      0.001,
+  )
+  const result = estimateBattleStats({
+    now,
+    fairFightObservations: [
+      {
+        targetId: '1',
+        attackerId: '1',
+        attackerBss: 2_000,
+        defenderBss: 2_000,
+        attackerBalanceFactor: 1,
+        fairFight: 7 / 3,
+        timestamp: now,
+      },
+    ],
+  })
+  assert.ok(Math.abs((result.bss ?? 0) - 4_000) < 0.001)
+  assert.equal(result.estimate, 4_000_000)
+  assert.deepEqual(result.sources, ['FAIR_FIGHT'])
+})
+
+test('does not invent a total-stat estimate without Fair Fight evidence', () => {
+  const result = estimateBattleStats({ now })
+  assert.equal(result.estimate, null)
+  assert.deepEqual(result.sources, ['FALLBACK'])
 })
 
 test('uses exact stats ahead of every estimate source', () => {
@@ -153,7 +185,7 @@ test('uses a high capped Fair Fight score as a battle-stat lower bound', () => {
       },
     ],
   })
-  assert.ok(result.estimate)
+  assert.equal(result.estimate, null)
   assert.ok(result.lowerBound)
   assert.equal(result.upperBound, null)
   assert.deepEqual(result.sources, ['FAIR_FIGHT'])
@@ -173,36 +205,62 @@ test('uses a low capped Fair Fight score as a battle-stat upper bound', () => {
       },
     ],
   })
-  assert.ok(result.estimate !== null)
+  assert.equal(result.estimate, null)
   assert.equal(result.lowerBound, 0)
   assert.ok(result.upperBound)
   assert.deepEqual(result.sources, ['FAIR_FIGHT'])
   assert.match(result.explanation, /upper bound/)
 })
 
-test('uses age, level, and medal count to refine a Fair Fight estimate', () => {
+test("scales the attacker's total stats by the squared Fair Fight score ratio", () => {
   const observation = {
     targetId: '1',
     attackerId: '2',
-    attackerBss: 8_000,
+    attackerBss: 4_000,
+    attackerBalanceFactor: 1,
     fairFight: 2,
     timestamp: now,
   }
-  const withoutMedals = estimateBattleStats({
+  const balancedResult = estimateBattleStats({
     now,
     fairFightObservations: [observation],
-    weakMetadata: { age: 400, level: 50, medals: 0 },
   })
-  const withMedals = estimateBattleStats({
+  const skewedResult = estimateBattleStats({
     now,
-    fairFightObservations: [observation],
+    fairFightObservations: [{ ...observation, attackerBalanceFactor: 2 }],
     weakMetadata: { age: 400, level: 50, medals: 80 },
   })
-  assert.ok(withoutMedals.estimate && withMedals.estimate)
-  assert.ok(withMedals.estimate > withoutMedals.estimate)
-  assert.ok(withMedals.estimate >= (withMedals.lowerBound ?? 0))
-  assert.ok(withMedals.estimate <= (withMedals.upperBound ?? Infinity))
-  assert.ok(withMedals.sources.includes('PROFILE'))
+  assert.equal(balancedResult.bss, 1_500)
+  assert.equal(balancedResult.estimate, 562_500)
+  assert.equal(skewedResult.estimate, 1_125_000)
+  assert.deepEqual(skewedResult.sources, ['FAIR_FIGHT'])
+
+  const higherFairFight = estimateBattleStats({
+    now,
+    fairFightObservations: [{ ...observation, fairFight: 2.5 }],
+  })
+  assert.equal(higherFairFight.estimate, 1_265_625)
+})
+
+test('keeps profile metadata from overriding a measured Fair Fight score', () => {
+  const observation = {
+    targetId: '1',
+    attackerId: '2',
+    attackerBss: 4_000,
+    attackerBalanceFactor: 1.2,
+    fairFight: 2,
+    timestamp: now,
+  }
+  const measured = estimateBattleStats({
+    now,
+    fairFightObservations: [observation],
+  })
+  const withMetadata = estimateBattleStats({
+    now,
+    fairFightObservations: [observation],
+    weakMetadata: { age: 3_000, level: 100, medals: 100 },
+  })
+  assert.equal(withMetadata.estimate, measured.estimate)
 })
 
 test('returns a calibrated but low-confidence age/level prior', () => {

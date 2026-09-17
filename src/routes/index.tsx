@@ -14,6 +14,7 @@ type Target = {
   releaseAt: number
   reason: string
   lastSeen: string
+  hospitalRecommended: boolean
   priority: 'High' | 'Medium' | 'Low'
   battleStats: BattleStatsEstimate
 }
@@ -21,6 +22,8 @@ type Target = {
 type FactionMembersResponse = {
   faction: { id: number; name: string; tag: string }
   members: Target[]
+  fairFightStatus: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
+  fairFightReason?: string
   fetchedAt: number
   error?: string
 }
@@ -40,6 +43,10 @@ function Home() {
   const [filter, setFilter] = useState<(typeof filters)[number]>('All targets')
   const [query, setQuery] = useState('')
   const [targets, setTargets] = useState<Target[]>([])
+  const [fairFightStatus, setFairFightStatus] = useState<
+    FactionMembersResponse['fairFightStatus'] | null
+  >(null)
+  const [fairFightReason, setFairFightReason] = useState('')
   const [factionName, setFactionName] = useState('Enemy faction')
   const [synced, setSynced] = useState('Waiting for data')
   const [error, setError] = useState('')
@@ -120,6 +127,8 @@ function Home() {
         }
 
         setTargets(payload.members)
+        setFairFightStatus(payload.fairFightStatus)
+        setFairFightReason(payload.fairFightReason ?? '')
         setFactionName(payload.faction.name)
         setFactionId(String(payload.faction.id))
         setFactionInput(String(payload.faction.id))
@@ -409,7 +418,10 @@ function Home() {
           <div className="panel-header">
             <div>
               <h2>Opposing members</h2>
-              <p>Live member status from {factionName}</p>
+              <p>
+                Live member status from {factionName}. Stat estimates require a
+                usable Fair Fight score from your recent fights.
+              </p>
             </div>
             <button
               className="add-button"
@@ -419,6 +431,17 @@ function Home() {
               <span>&#8635;</span> Sync now
             </button>
           </div>
+          {fairFightStatus === 'UNAVAILABLE' && (
+            <p className="ff-evidence-note">
+              Fair Fight data is unavailable. {fairFightReason}
+            </p>
+          )}
+          {fairFightStatus === 'NO_RECENT_FIGHTS' && (
+            <p className="ff-evidence-note">
+              No recent fights were found. Torn cannot provide a Fair Fight
+              estimate for a player you have not fought.
+            </p>
+          )}
           <div className="toolbar">
             <div className="filter-tabs">
               {filters.map((item) => (
@@ -631,7 +654,12 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
         <span className="reason">{target.reason}</span>
       </td>
       <td>
-        <span className="last-seen">{target.lastSeen}</span>
+        <div className="last-seen">
+          <span>{target.lastSeen}</span>
+          {target.hospitalRecommended && (
+            <span className="hospital-recommended">Hospital recommended</span>
+          )}
+        </div>
       </td>
       <td>
         <BattleStatsCell estimate={target.battleStats} />
@@ -658,27 +686,59 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
 
 function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
   if (estimate.estimate === null) {
+    const cappedBound = estimate.sources.includes('FAIR_FIGHT')
+      ? estimate.lowerBound !== null && estimate.lowerBound > 0
+        ? `${formatBattleStats(estimate.lowerBound)}+`
+        : estimate.upperBound !== null
+          ? `≤${formatBattleStats(estimate.upperBound)}`
+          : null
+      : null
     return (
-      <span className="battle-stats-unavailable" title={estimate.explanation}>
-        No FF history
-      </span>
+      <div className="battle-stats" title={estimate.explanation}>
+        <strong>{cappedBound ?? 'No usable FF'}</strong>
+        <span className="battle-stats-method">
+          {cappedBound ? 'Capped FF · bound only' : 'No recent FF evidence'}
+        </span>
+      </div>
     )
   }
 
-  const range = estimate.sources.includes('FALLBACK')
-    ? `~${formatBattleStats(estimate.estimate)}`
-    : estimate.upperBound === null
-      ? `${formatBattleStats(estimate.lowerBound)}+`
-      : estimate.lowerBound === estimate.upperBound
-        ? formatBattleStats(estimate.estimate)
-        : `${formatBattleStats(estimate.lowerBound ?? 0)}–${formatBattleStats(estimate.upperBound)}`
+  const range =
+    estimate.upperBound !== null && estimate.lowerBound === estimate.upperBound
+      ? formatBattleStats(estimate.estimate)
+      : estimate.upperBound === null &&
+          estimate.estimate === estimate.lowerBound
+        ? `${formatBattleStats(estimate.lowerBound)}+`
+        : `~${formatBattleStats(estimate.estimate)}`
+  const bounds = estimate.sources.includes('FALLBACK')
+    ? null
+    : estimate.upperBound === null && estimate.estimate === estimate.lowerBound
+      ? null
+      : estimate.upperBound === null
+        ? `${formatBattleStats(estimate.lowerBound ?? 0)}+`
+        : estimate.lowerBound === estimate.upperBound
+          ? null
+          : `${formatBattleStats(estimate.lowerBound ?? 0)}–${formatBattleStats(estimate.upperBound)}`
+  const method = estimate.sources.includes('EXACT')
+    ? 'Exact stats'
+    : estimate.sources.includes('SPY') &&
+        !estimate.sources.includes('FAIR_FIGHT')
+      ? 'Spy estimate'
+      : estimate.sources.includes('FAIR_FIGHT')
+        ? estimate.diagnostics.observationsAccepted > 0
+          ? `FF-based · ${estimate.diagnostics.observationsAccepted} hit${estimate.diagnostics.observationsAccepted === 1 ? '' : 's'}`
+          : 'Capped FF bound'
+        : estimate.sources.includes('FALLBACK')
+          ? 'Profile estimate · FF not used'
+          : 'Rank estimate'
   return (
     <div className="battle-stats" title={estimate.explanation}>
       <strong>{range}</strong>
+      <span className="battle-stats-method">{method}</span>
       <span>
+        {bounds ? `${bounds} · ` : ''}
         {estimate.bss === null ? '' : `BSS ${Math.round(estimate.bss)} · `}
-        {estimate.confidenceLevel.replace('_', ' ')} ·{' '}
-        {estimate.sources.join(' + ')}
+        {estimate.confidenceLevel.replace('_', ' ')}
       </span>
     </div>
   )

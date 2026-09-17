@@ -658,6 +658,19 @@ td {
 .last-seen {
   color: #71828d;
 }
+.hospital-recommended {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  border: 1px solid #ef8167;
+  border-radius: 3px;
+  padding: 2px 4px;
+  color: #ff9b83;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .battle-stats {
   display: grid;
   gap: 3px;
@@ -672,8 +685,17 @@ td {
   color: #71828d;
   font-size: 9px;
 }
+.battle-stats .battle-stats-method {
+  color: #9fc6b5;
+  font-size: 10px;
+}
 .battle-stats-unavailable {
   font-style: italic;
+}
+.ff-evidence-note {
+  margin: 0 20px 12px;
+  color: #e6b77b;
+  font-size: 12px;
 }
 .priority {
   font-size: 10px;

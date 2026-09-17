@@ -665,17 +665,27 @@ function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
     )
   }
 
-  const range = estimate.sources.includes('FALLBACK')
-    ? `~${formatBattleStats(estimate.estimate)}`
-    : estimate.upperBound === null
-      ? `${formatBattleStats(estimate.lowerBound)}+`
-      : estimate.lowerBound === estimate.upperBound
-        ? formatBattleStats(estimate.estimate)
-        : `${formatBattleStats(estimate.lowerBound ?? 0)}–${formatBattleStats(estimate.upperBound)}`
+  const range =
+    estimate.upperBound !== null && estimate.lowerBound === estimate.upperBound
+      ? formatBattleStats(estimate.estimate)
+      : estimate.upperBound === null &&
+          estimate.estimate === estimate.lowerBound
+        ? `${formatBattleStats(estimate.lowerBound)}+`
+        : `~${formatBattleStats(estimate.estimate)}`
+  const bounds = estimate.sources.includes('FALLBACK')
+    ? null
+    : estimate.upperBound === null && estimate.estimate === estimate.lowerBound
+      ? null
+      : estimate.upperBound === null
+        ? `${formatBattleStats(estimate.lowerBound ?? 0)}+`
+        : estimate.lowerBound === estimate.upperBound
+          ? null
+          : `${formatBattleStats(estimate.lowerBound ?? 0)}–${formatBattleStats(estimate.upperBound)}`
   return (
     <div className="battle-stats" title={estimate.explanation}>
       <strong>{range}</strong>
       <span>
+        {bounds ? `${bounds} · ` : ''}
         {estimate.bss === null ? '' : `BSS ${Math.round(estimate.bss)} · `}
         {estimate.confidenceLevel.replace('_', ' ')} ·{' '}
         {estimate.sources.join(' + ')}

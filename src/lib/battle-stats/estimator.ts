@@ -30,7 +30,7 @@ export type RankEvidence = {
 }
 
 export type CalibrationSample = { stats: BattleStats }
-export type WeakMetadata = { age?: number; level?: number }
+export type WeakMetadata = { age?: number; level?: number; medals?: number }
 
 export type BattleStatsEstimate = {
   estimate: number | null
@@ -39,7 +39,9 @@ export type BattleStatsEstimate = {
   bss: number | null
   confidence: number
   confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH'
-  sources: Array<'EXACT' | 'SPY' | 'FAIR_FIGHT' | 'RANK' | 'FALLBACK'>
+  sources: Array<
+    'EXACT' | 'SPY' | 'FAIR_FIGHT' | 'PROFILE' | 'RANK' | 'FALLBACK'
+  >
   newestEvidenceAt: number | null
   explanation: string
   warnings: string[]
@@ -123,6 +125,43 @@ export function estimateBssFromFairFight(
   return (fairFight - 1) * (3 / 8) * attackerBss
 }
 
+/**
+ * Torn clamps Fair Fight scores at both ends. A clamped score cannot be
+ * inverted into an exact BSS, but it is still evidence: a score at the high
+ * cap establishes a lower bound and a score at the low cap an upper bound.
+ */
+function estimateBssBoundsFromFairFight(
+  fairFight: number,
+  attackerBss: number,
+): { lowerBound?: number; upperBound?: number } | null {
+  if (
+    !Number.isFinite(fairFight) ||
+    !Number.isFinite(attackerBss) ||
+    attackerBss <= 0
+  ) {
+    return null
+  }
+
+  const multiplier = 3 / 8
+  if (fairFight >= ESTIMATOR_CONFIG.fairFight.cappedAtOrAbove) {
+    return {
+      lowerBound:
+        (ESTIMATOR_CONFIG.fairFight.cappedAtOrAbove - 1) *
+        multiplier *
+        attackerBss,
+    }
+  }
+  if (fairFight <= ESTIMATOR_CONFIG.fairFight.weakAtOrBelow) {
+    return {
+      upperBound:
+        (ESTIMATOR_CONFIG.fairFight.weakAtOrBelow - 1) *
+        multiplier *
+        attackerBss,
+    }
+  }
+  return null
+}
+
 type WeightedValue = { value: number; weight: number }
 
 function weightedMedian(values: WeightedValue[]): number {
@@ -189,6 +228,31 @@ function newestTimestamp(values: Array<number | undefined>): number | null {
     (value): value is number => typeof value === 'number',
   )
   return valid.length ? Math.max(...valid) : null
+}
+
+function profileEstimateWithinBounds(
+  metadata: WeakMetadata | undefined,
+  lowerBound: number,
+  upperBound: number | null,
+  fairFightCentre?: number,
+): number {
+  const profileEstimate = weakMetadataEstimate(metadata)
+  const centre =
+    fairFightCentre === undefined
+      ? (profileEstimate ??
+        (upperBound === null ? lowerBound : (lowerBound + upperBound) / 2))
+      : profileEstimate === null
+        ? fairFightCentre
+        : Math.exp(
+            0.8 * Math.log(Math.max(1, fairFightCentre)) +
+              0.2 * Math.log(Math.max(1, profileEstimate)),
+          )
+  return Math.round(
+    Math.max(
+      lowerBound,
+      Math.min(centre, upperBound ?? Number.POSITIVE_INFINITY),
+    ),
+  )
 }
 
 export function estimateBattleStats(input: {
@@ -330,7 +394,12 @@ export function estimateBattleStats(input: {
       (evidenceConflict ? ESTIMATOR_CONFIG.confidence.conflictPenalty : 0)
     confidence = Math.round(Math.max(0, Math.min(99, confidence)))
     return {
-      estimate: mathematicalMinimum * factors.median,
+      estimate: profileEstimateWithinBounds(
+        input.weakMetadata,
+        lowerBound,
+        upperBound,
+        mathematicalMinimum * factors.median,
+      ),
       lowerBound,
       upperBound,
       bss,
@@ -338,6 +407,9 @@ export function estimateBattleStats(input: {
       confidenceLevel: confidenceLevel(confidence),
       sources: [
         'FAIR_FIGHT',
+        ...(weakMetadataEstimate(input.weakMetadata) !== null
+          ? (['PROFILE'] as const)
+          : []),
         ...(input.spy ? (['SPY'] as const) : []),
         ...(input.rankEvidence ? (['RANK'] as const) : []),
       ],
@@ -346,7 +418,7 @@ export function estimateBattleStats(input: {
         input.spy?.timestamp,
         input.rankEvidence?.timestamp,
       ]),
-      explanation: `Weighted median of ${accepted.length} uncapped Fair Fight observation${accepted.length === 1 ? '' : 's'}, converted from BSS using ${factors.calibrated ? 'calibrated' : 'broad uncalibrated'} stat-distribution factors.`,
+      explanation: `Weighted median of ${accepted.length} uncapped Fair Fight observation${accepted.length === 1 ? '' : 's'}, converted from BSS using ${factors.calibrated ? 'calibrated' : 'broad uncalibrated'} stat-distribution factors.${weakMetadataEstimate(input.weakMetadata) === null ? '' : ' Level, age, and available medals modestly adjust the point estimate within that range.'}`,
       warnings: [
         'Total battle stats depend on stat distribution.',
         ...(!factors.calibrated
@@ -366,6 +438,112 @@ export function estimateBattleStats(input: {
         bssSpread: spread,
         rankConstraintUsed,
         evidenceConflict,
+      },
+    }
+  }
+
+  const cappedBounds = observations.reduce(
+    (bounds, observation) => {
+      if (observation.top1000Capped) return bounds
+      const bssBounds = estimateBssBoundsFromFairFight(
+        observation.fairFight,
+        observation.attackerBss,
+      )
+      if (!bssBounds) return bounds
+      return {
+        lowerBss:
+          bssBounds.lowerBound === undefined
+            ? bounds.lowerBss
+            : Math.max(bounds.lowerBss ?? 0, bssBounds.lowerBound),
+        upperBss:
+          bssBounds.upperBound === undefined
+            ? bounds.upperBss
+            : Math.min(
+                bounds.upperBss ?? Number.POSITIVE_INFINITY,
+                bssBounds.upperBound,
+              ),
+        count: bounds.count + 1,
+      }
+    },
+    {
+      lowerBss: undefined as number | undefined,
+      upperBss: undefined as number | undefined,
+      count: 0,
+    },
+  )
+
+  if (cappedBounds.count) {
+    const lowerBss = cappedBounds.lowerBss ?? 0
+    const upperBss = cappedBounds.upperBss
+    const boundsConflict = upperBss !== undefined && lowerBss > upperBss
+    const constrainedLowerBss = boundsConflict ? 0 : lowerBss
+    const constrainedUpperBss = boundsConflict ? undefined : upperBss
+    const factors = calibrationFactors(input.calibrationSamples ?? [])
+    const lowerBound =
+      constrainedLowerBss === 0
+        ? 0
+        : (constrainedLowerBss * constrainedLowerBss * factors.low) / 4
+    const upperBound =
+      constrainedUpperBss === undefined
+        ? null
+        : (constrainedUpperBss * constrainedUpperBss * factors.high) / 4
+    const confidence = Math.round(
+      Math.max(
+        0,
+        Math.min(
+          65,
+          ESTIMATOR_CONFIG.confidence.fairFightBase -
+            10 +
+            cappedBounds.count * 4 -
+            (!factors.calibrated
+              ? ESTIMATOR_CONFIG.confidence.uncalibratedPenalty
+              : 0) -
+            (boundsConflict ? ESTIMATOR_CONFIG.confidence.conflictPenalty : 0),
+        ),
+      ),
+    )
+    return {
+      estimate: profileEstimateWithinBounds(
+        input.weakMetadata,
+        lowerBound,
+        upperBound,
+      ),
+      lowerBound,
+      upperBound,
+      bss: constrainedUpperBss ?? constrainedLowerBss,
+      confidence,
+      confidenceLevel: confidenceLevel(confidence),
+      sources: [
+        'FAIR_FIGHT',
+        ...(weakMetadataEstimate(input.weakMetadata) !== null
+          ? (['PROFILE'] as const)
+          : []),
+      ],
+      newestEvidenceAt: newestTimestamp(
+        observations.map((observation) => observation.timestamp),
+      ),
+      explanation:
+        upperBound === null
+          ? `Fair Fight reached Torn's high cap in ${cappedBounds.count} observation${cappedBounds.count === 1 ? '' : 's'}, so it establishes a lower bound. Level, age, and available medals supply only a low-confidence point estimate above that bound.`
+          : `Fair Fight reached Torn's low cap in ${cappedBounds.count} observation${cappedBounds.count === 1 ? '' : 's'}, so it establishes an upper bound. Level, age, and available medals supply only a low-confidence point estimate below that bound.`,
+      warnings: [
+        'Torn caps this Fair Fight score, so the exact battle-stat total cannot be recovered.',
+        ...(cappedBounds.lowerBss !== undefined
+          ? [
+              'A 3x Fair Fight can also result from Torn’s top-1000 stat-score rule; treat its lower bound as approximate.',
+            ]
+          : []),
+        ...(boundsConflict
+          ? [
+              'Capped Fair Fight observations conflict; no combined bound was applied.',
+            ]
+          : []),
+      ],
+      diagnostics: {
+        ...diagnostics,
+        weightedMedianBss: constrainedUpperBss ?? constrainedLowerBss,
+        bssSpread: null,
+        evidenceConflict: boundsConflict,
       },
     }
   }
@@ -452,12 +630,8 @@ export function estimateBattleStats(input: {
           ESTIMATOR_CONFIG.metadataPrior.residualP90 -
             ESTIMATOR_CONFIG.metadataPrior.residualP50,
         )
-  const displayEstimate =
-    weakLowerBound === null || weakUpperBound === null
-      ? weakEstimate
-      : Math.round(((weakLowerBound + weakUpperBound) / 2) * 0.45)
   return {
-    estimate: displayEstimate,
+    estimate: weakEstimate,
     lowerBound: weakLowerBound,
     upperBound: weakUpperBound,
     bss: null,
@@ -483,8 +657,15 @@ function weakMetadataEstimate(
 ): number | null {
   const level = metadata?.level
   if (!level || !Number.isFinite(level) || level < 1) return null
+  const medals = metadata.medals
+  // Medal count is broad activity evidence, not a battle-stat measurement.
+  // Cap its influence at 20% so it cannot overpower Fair Fight evidence.
+  const medalFactor =
+    medals !== undefined && Number.isFinite(medals) && medals >= 0
+      ? 1 + Math.min(medals, 100) / 500
+      : 1
   if (!metadata.age || !Number.isFinite(metadata.age) || metadata.age < 1) {
-    return Math.round(10_000 * Math.pow(level, 1.5))
+    return Math.round(10_000 * Math.pow(level, 1.5) * medalFactor)
   }
   const model = ESTIMATOR_CONFIG.metadataPrior
   const logTotal =
@@ -492,7 +673,7 @@ function weakMetadataEstimate(
     model.logAge * Math.log10(metadata.age) +
     model.logLevel * Math.log10(level) +
     model.residualP50
-  return Math.round(Math.pow(10, logTotal))
+  return Math.round(Math.pow(10, logTotal) * medalFactor)
   /*
   // This only centres an explicitly 10,000×-wide, low-confidence prior.
   return Math.round(10_000 * Math.pow(level, 1.5))

@@ -39,6 +39,7 @@ type TornAttack = {
 }
 
 type TornCombatResponse = {
+  player_id?: number
   battlestats?: {
     strength?: TornBattleStat
     speed?: TornBattleStat
@@ -113,7 +114,11 @@ export const Route = createFileRoute('/api/faction-members')({
             apiKey,
             now,
           )
-          await loadMedalCounts(Object.keys(faction.members ?? {}), apiKey, now)
+          const medalCounts = await loadMedalCounts(
+            Object.keys(faction.members ?? {}),
+            apiKey,
+            now,
+          )
           const members = Object.entries(faction.members ?? {})
             .map(([id, member]) =>
               formatMember(
@@ -122,6 +127,7 @@ export const Route = createFileRoute('/api/faction-members')({
                 now,
                 fairFightByTarget.get(id) ?? [],
                 ages.get(id),
+                medalCounts.get(id),
               ),
             )
             .sort((left, right) => {
@@ -163,6 +169,7 @@ function formatMember(
   now: number,
   fairFightObservations: FairFightObservation[],
   age?: number,
+  medals?: number,
 ) {
   const state = member.status.state ?? 'Unknown'
   const releaseAt = (member.status.until ?? 0) * 1000
@@ -196,7 +203,7 @@ function formatMember(
     battleStats: estimateBattleStats({
       now,
       fairFightObservations,
-      weakMetadata: { age, level: member.level },
+      weakMetadata: { age, level: member.level, medals },
     }),
   } as const
 }
@@ -258,13 +265,19 @@ async function loadMedalCounts(ids: string[], apiKey: string, now: number) {
       }
     }),
   )
+  return new Map(
+    ids.flatMap((id) => {
+      const cached = medalCountCache.get(id)
+      return cached ? [[id, cached.count] as const] : []
+    }),
+  )
 }
 
 async function loadFairFightEvidence(apiKey: string, now: number) {
   // v1 is intentionally used here because the application already uses it and
   // it lets a limited key request its own stats and detailed attacks together.
   const url = new URL('https://api.torn.com/user/')
-  url.searchParams.set('selections', 'battlestats,attacks')
+  url.searchParams.set('selections', 'profile,battlestats,attacks')
   url.searchParams.set('key', apiKey)
 
   try {
@@ -272,6 +285,7 @@ async function loadFairFightEvidence(apiKey: string, now: number) {
     if (!response.ok) return new Map<string, FairFightObservation[]>()
     const combat = (await response.json()) as TornCombatResponse
     if (combat.error) return new Map<string, FairFightObservation[]>()
+    if (!combat.player_id) return new Map<string, FairFightObservation[]>()
 
     const stats = parseBattleStats(combat.battlestats)
     if (!stats) return new Map<string, FairFightObservation[]>()
@@ -281,6 +295,9 @@ async function loadFairFightEvidence(apiKey: string, now: number) {
       : Object.values(combat.attacks ?? {})
     const observations = new Map<string, FairFightObservation[]>()
     for (const attack of attacks) {
+      // The user's attack history can include incoming fights. Its own current
+      // stats only describe the attacker in outgoing fights.
+      if (attack.attacker_id !== combat.player_id) continue
       const targetId = attack.defender_id
       const fairFight = attack.modifiers?.fair_fight
       const timestamp =

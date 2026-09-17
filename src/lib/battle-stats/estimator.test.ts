@@ -140,7 +140,7 @@ test('uses agreeing rank evidence as a constraint and flags conflicts', () => {
   )
 })
 
-test('reports no usable evidence instead of estimating from level or capped Fair Fight', () => {
+test('uses a high capped Fair Fight score as a battle-stat lower bound', () => {
   const result = estimateBattleStats({
     now,
     fairFightObservations: [
@@ -153,8 +153,56 @@ test('reports no usable evidence instead of estimating from level or capped Fair
       },
     ],
   })
-  assert.equal(result.estimate, null)
-  assert.deepEqual(result.sources, ['FALLBACK'])
+  assert.ok(result.estimate)
+  assert.ok(result.lowerBound)
+  assert.equal(result.upperBound, null)
+  assert.deepEqual(result.sources, ['FAIR_FIGHT'])
+  assert.match(result.explanation, /lower bound/)
+})
+
+test('uses a low capped Fair Fight score as a battle-stat upper bound', () => {
+  const result = estimateBattleStats({
+    now,
+    fairFightObservations: [
+      {
+        targetId: '1',
+        attackerId: '2',
+        attackerBss: 800,
+        fairFight: 1,
+        timestamp: now,
+      },
+    ],
+  })
+  assert.ok(result.estimate !== null)
+  assert.equal(result.lowerBound, 0)
+  assert.ok(result.upperBound)
+  assert.deepEqual(result.sources, ['FAIR_FIGHT'])
+  assert.match(result.explanation, /upper bound/)
+})
+
+test('uses age, level, and medal count to refine a Fair Fight estimate', () => {
+  const observation = {
+    targetId: '1',
+    attackerId: '2',
+    attackerBss: 8_000,
+    fairFight: 2,
+    timestamp: now,
+  }
+  const withoutMedals = estimateBattleStats({
+    now,
+    fairFightObservations: [observation],
+    weakMetadata: { age: 400, level: 50, medals: 0 },
+  })
+  const withMedals = estimateBattleStats({
+    now,
+    fairFightObservations: [observation],
+    weakMetadata: { age: 400, level: 50, medals: 80 },
+  })
+  assert.ok(withoutMedals.estimate && withMedals.estimate)
+  assert.ok(withMedals.estimate > withoutMedals.estimate)
+  assert.ok(withMedals.estimate >= (withMedals.lowerBound ?? 0))
+  assert.ok(withMedals.estimate <= (withMedals.upperBound ?? Infinity))
+  assert.ok(withMedals.sources.includes('PROFILE'))
 })
 
 test('returns a calibrated but low-confidence age/level prior', () => {
@@ -166,8 +214,6 @@ test('returns a calibrated but low-confidence age/level prior', () => {
   assert.equal(result.sources[0], 'FALLBACK')
   assert.ok(result.estimate && result.lowerBound && result.upperBound)
   assert.ok(result.upperBound / result.lowerBound > 40)
-  assert.equal(
-    result.estimate,
-    Math.round(((result.lowerBound + result.upperBound) / 2) * 0.45),
-  )
+  assert.ok(result.estimate > result.lowerBound)
+  assert.ok(result.estimate < result.upperBound)
 })

@@ -1,17 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import { verifyTornUser } from '#/lib/torn-user'
+import type { UserProfile } from '#/lib/torn-user'
 
 export const Route = createFileRoute('/settings')({ component: Settings })
-
-type UserProfile = {
-  id: number
-  name: string
-  level: number
-  factionName: string
-}
-
-type UserResponse = { user?: UserProfile; error?: string }
 
 function Settings() {
   const [apiKey, setApiKey] = useState('')
@@ -30,18 +23,10 @@ function Settings() {
     setIsChecking(true)
     setError('')
     try {
-      const response = await fetch('/api/user', {
-        cache: 'no-store',
-        headers: { 'X-Torn-Api-Key': publicApiKey },
-      })
-      const payload = (await response.json()) as UserResponse
-      if (!response.ok || !payload.user || payload.error) {
-        throw new Error(payload.error ?? 'Unable to verify your Torn API key.')
-      }
-
+      const verifiedUser = await verifyTornUser(publicApiKey)
       window.localStorage.setItem('tornintel.apiKey', publicApiKey)
       setApiKey(publicApiKey)
-      setUser(payload.user)
+      setUser(verifiedUser)
       return true
     } catch (requestError) {
       window.localStorage.removeItem('tornintel.apiKey')

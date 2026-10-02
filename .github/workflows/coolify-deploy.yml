@@ -2,7 +2,7 @@ name: Build & Deploy to Coolify
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}   # owner/repo
+  IMAGE_NAME: ${{ github.repository }} # owner/repo
 
 jobs:
   build-and-deploy:

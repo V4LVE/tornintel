@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
+import { verifyTornUser } from '#/lib/torn-user'
+import type { UserProfile } from '#/lib/torn-user'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -27,15 +29,6 @@ type FactionMembersResponse = {
   fetchedAt: number
   error?: string
 }
-
-type UserProfile = {
-  id: number
-  name: string
-  level: number
-  factionName: string
-}
-
-type UserResponse = { user?: UserProfile; error?: string }
 
 type CombatBarsResponse = {
   energy?: {
@@ -120,20 +113,10 @@ function Home() {
     setIsAuthenticating(true)
     setAuthenticationError('')
     try {
-      const response = await fetch('/api/user', {
-        cache: 'no-store',
-        headers: { 'X-Torn-Api-Key': requestedApiKey },
-      })
-      const payload = (await response.json()) as UserResponse
-      if (!response.ok || !payload.user || payload.error) {
-        throw new Error(
-          payload.error ?? 'Unable to verify your Torn public API key.',
-        )
-      }
-
+      const verifiedUser = await verifyTornUser(requestedApiKey)
       window.localStorage.setItem('tornintel.apiKey', requestedApiKey)
       setApiKey(requestedApiKey)
-      setUser(payload.user)
+      setUser(verifiedUser)
       return true
     } catch (requestError) {
       setAuthenticationError(
@@ -348,9 +331,6 @@ function Home() {
           </a>
           <a className="nav-item" href="#targets">
             <span className="nav-icon">#</span> Target list
-          </a>
-          <a className="nav-item" href="#chain">
-            <span className="nav-icon">&#8594;</span> Chain tracker
           </a>
           <a className="nav-item" href="/payouts">
             <span className="nav-icon">$</span> War payout

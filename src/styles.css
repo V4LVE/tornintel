@@ -426,6 +426,90 @@ button {
   color: #627580;
   font-size: 10px;
 }
+.combat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.combat-panel {
+  padding: 20px 24px;
+}
+.combat-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.combat-kicker {
+  color: #71828d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.panel.combat-panel h2 {
+  margin: 5px 0 0;
+}
+.combat-indicator {
+  border-radius: 10px;
+  background: #253c35;
+  color: #80dba8;
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.combat-value {
+  margin: 21px 0 17px;
+  color: #f0f4f5;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.combat-value span {
+  color: #81929c;
+  font-size: 13px;
+  font-weight: 500;
+}
+.energy-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #2c3942;
+  margin-bottom: 20px;
+}
+.energy-track > div {
+  height: 100%;
+  border-radius: inherit;
+  background: #79dca3;
+}
+.combat-timers {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.combat-timers div {
+  display: grid;
+  gap: 5px;
+}
+.combat-timers span {
+  color: #71828d;
+  font-size: 10px;
+}
+.combat-timers strong {
+  color: #e7edef;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.combat-empty {
+  margin: 22px 0 16px;
+  color: #82929d;
+  font-size: 12px;
+}
+.combat-error {
+  margin: 14px 0 0;
+  color: #ef8167;
+  font-size: 11px;
+}
 .panel {
   border: 1px solid #293741;
   border-radius: 7px;
@@ -1114,6 +1198,14 @@ td {
   .stat-grid {
     gap: 9px;
     margin-bottom: 16px;
+  }
+  .combat-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    margin-bottom: 16px;
+  }
+  .combat-panel {
+    padding: 18px 16px;
   }
   .stat-card {
     min-height: 100px;

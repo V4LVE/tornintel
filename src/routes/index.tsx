@@ -37,6 +37,25 @@ type UserProfile = {
 
 type UserResponse = { user?: UserProfile; error?: string }
 
+type CombatBarsResponse = {
+  energy?: {
+    current: number
+    maximum: number
+    increment: number
+    interval: number
+    tick_time: number
+    full_time: number
+  }
+  chain?: {
+    current: number
+    max: number
+    timeout: number
+    cooldown: number
+  } | null
+  fetchedAt?: number
+  error?: string
+}
+
 const filters = ['All targets', 'In hospital', 'Ready', 'Traveling'] as const
 
 function Home() {
@@ -60,6 +79,36 @@ function Home() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [authenticationError, setAuthenticationError] = useState('')
+  const [combatBars, setCombatBars] = useState<CombatBarsResponse | null>(null)
+  const [combatBarsError, setCombatBarsError] = useState('')
+
+  const refreshCombatBars = useCallback(async (key: string) => {
+    try {
+      const response = await fetch('/api/combat-bars', {
+        cache: 'no-store',
+        headers: { 'X-Torn-Api-Key': key },
+      })
+      const payload = (await response.json()) as CombatBarsResponse
+      if (
+        !response.ok ||
+        payload.error ||
+        !payload.energy ||
+        !payload.fetchedAt
+      ) {
+        throw new Error(
+          payload.error ?? 'Unable to load energy and chain data.',
+        )
+      }
+      setCombatBars(payload)
+      setCombatBarsError('')
+    } catch (requestError) {
+      setCombatBarsError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to load energy and chain data.',
+      )
+    }
+  }, [])
 
   const authenticate = useCallback(async (key: string) => {
     const requestedApiKey = key.trim()
@@ -185,6 +234,17 @@ function Home() {
   }, [apiKey, hasInitialized, isPaused, refreshTargets, user])
 
   useEffect(() => {
+    if (!hasInitialized || !apiKey || !user) return
+    void refreshCombatBars(apiKey)
+    const refreshTimer = window.setInterval(
+      () => void refreshCombatBars(apiKey),
+      30000,
+    )
+    return () => window.clearInterval(refreshTimer)
+  }, [apiKey, hasInitialized, refreshCombatBars, user])
+
+  useEffect(() => {
+    setClock(Date.now())
     const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
     return () => window.clearInterval(clockTimer)
   }, [])
@@ -247,6 +307,17 @@ function Home() {
   const onlineReadyTargets = readyTargets.filter((target) =>
     target.lastSeen.includes('0 minutes'),
   ).length
+  const chainDeadline =
+    combatBars?.chain && combatBars.fetchedAt
+      ? combatBars.fetchedAt + combatBars.chain.timeout * 1000
+      : 0
+  const activeChain = Boolean(
+    combatBars?.chain?.current && chainDeadline > clock,
+  )
+  const energyNow =
+    combatBars?.energy && combatBars.fetchedAt
+      ? projectEnergy(combatBars.energy, combatBars.fetchedAt, clock)
+      : null
 
   if (!hasInitialized || (isAuthenticating && !user)) {
     return <ApiKeyGate isLoading />
@@ -280,7 +351,6 @@ function Home() {
           </a>
           <a className="nav-item" href="#chain">
             <span className="nav-icon">&#8594;</span> Chain tracker
-            <span className="soon">Soon</span>
           </a>
           <a className="nav-item" href="/payouts">
             <span className="nav-icon">$</span> War payout
@@ -412,6 +482,109 @@ function Home() {
             icon="~"
             tone="purple"
           />
+        </div>
+
+        <div className="combat-grid">
+          <section
+            className="panel combat-panel"
+            id="chain"
+            aria-label="Faction chain tracker"
+          >
+            <div className="combat-heading">
+              <div>
+                <span className="combat-kicker">YOUR FACTION</span>
+                <h2>Chain tracker</h2>
+              </div>
+              <span className="combat-indicator">
+                {activeChain ? 'Active' : 'Idle'}
+              </span>
+            </div>
+            {activeChain && combatBars?.chain ? (
+              <>
+                <div className="combat-value">
+                  {combatBars.chain.current.toLocaleString()} <span>hits</span>
+                </div>
+                <div className="combat-timers">
+                  <div>
+                    <span>Chain ends in</span>
+                    <strong>{formatCountdown(chainDeadline, clock)}</strong>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="combat-empty">
+                {combatBars
+                  ? 'No active chain'
+                  : combatBarsError
+                    ? 'Chain unavailable'
+                    : 'Loading chain…'}
+              </p>
+            )}
+            {combatBarsError && (
+              <p className="combat-error">{combatBarsError}</p>
+            )}
+          </section>
+          <section className="panel combat-panel" aria-label="Energy bar">
+            <div className="combat-heading">
+              <div>
+                <span className="combat-kicker">YOUR ENERGY</span>
+                <h2>Energy</h2>
+              </div>
+            </div>
+            {combatBars?.energy && energyNow ? (
+              <>
+                <div className="combat-value">
+                  {energyNow.current} <span>/ {combatBars.energy.maximum}</span>
+                </div>
+                <div
+                  className="energy-track"
+                  role="progressbar"
+                  aria-label="Energy"
+                  aria-valuenow={Math.min(
+                    energyNow.current,
+                    combatBars.energy.maximum,
+                  )}
+                  aria-valuemin={0}
+                  aria-valuemax={combatBars.energy.maximum}
+                >
+                  <div
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (energyNow.current / combatBars.energy.maximum) * 100))}%`,
+                    }}
+                  />
+                </div>
+                <div className="combat-timers">
+                  <div>
+                    <span>Next refill</span>
+                    <strong>
+                      {energyNow.current >= combatBars.energy.maximum
+                        ? 'Full'
+                        : formatCountdown(energyNow.nextTickAt, clock)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Full refill</span>
+                    <strong>
+                      {energyNow.current >= combatBars.energy.maximum
+                        ? 'Full'
+                        : formatCountdown(
+                            combatBars.fetchedAt! +
+                              combatBars.energy.full_time * 1000,
+                            clock,
+                          )}
+                    </strong>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="combat-empty">
+                {combatBarsError ? 'Energy unavailable' : 'Loading energy…'}
+              </p>
+            )}
+            {combatBarsError && (
+              <p className="combat-error">{combatBarsError}</p>
+            )}
+          </section>
         </div>
 
         <section className="panel target-panel" id="targets">
@@ -765,4 +938,38 @@ function formatRelease(releaseAt: number, now: number) {
     ':' +
     String(remainingSeconds).padStart(2, '0')
   )
+}
+
+function formatCountdown(deadline: number, now: number) {
+  const seconds = Math.max(0, Math.ceil((deadline - now) / 1000))
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainingSeconds = seconds % 60
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
+    : `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
+}
+
+function projectEnergy(
+  energy: NonNullable<CombatBarsResponse['energy']>,
+  fetchedAt: number,
+  now: number,
+) {
+  const firstTickAt = fetchedAt + energy.tick_time * 1000
+  if (
+    energy.current >= energy.maximum ||
+    energy.interval <= 0 ||
+    energy.increment <= 0 ||
+    now < firstTickAt
+  ) {
+    return { current: energy.current, nextTickAt: firstTickAt }
+  }
+  const ticks = 1 + Math.floor((now - firstTickAt) / (energy.interval * 1000))
+  return {
+    current: Math.min(
+      energy.maximum,
+      energy.current + ticks * energy.increment,
+    ),
+    nextTickAt: firstTickAt + ticks * energy.interval * 1000,
+  }
 }

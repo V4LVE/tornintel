@@ -17,43 +17,44 @@ function Payouts() {
   const [error, setError] = useState('')
   useEffect(() => {
     const key = localStorage.getItem('tornintel.apiKey') ?? ''
-    setPaid(
-      JSON.parse(
-        localStorage.getItem('tornintel.paidPayouts') ?? '[]',
-      ) as string[],
-    )
-    void fetch('/api/payout-hits', { headers: { 'X-Torn-Api-Key': key } }).then(
-      async (response) => {
-        const data = (await response.json()) as {
-          wars?: War[]
-          error?: string
-        }
-        if (!response.ok || data.error)
-          setError(data.error ?? 'Could not load hits.')
-        else {
-          setWars(data.wars ?? [])
-          setWarId(String(data.wars?.[0]?.id ?? ''))
-        }
-      },
-    )
+    setPaid(readPaidPayouts())
+    const controller = new AbortController()
+    async function loadWars() {
+      try {
+        const data = await fetchPayoutData<{ wars?: War[] }>(
+          '/api/payout-hits',
+          key,
+          controller.signal,
+        )
+        setWars(data.wars ?? [])
+        setWarId((current) => current || String(data.wars?.[0]?.id ?? ''))
+      } catch (requestError) {
+        if (!controller.signal.aborted) setError(errorMessage(requestError))
+      }
+    }
+    void loadWars()
+    return () => controller.abort()
   }, [])
   useEffect(() => {
     if (!warId) return
     const key = localStorage.getItem('tornintel.apiKey') ?? ''
-    void fetch(`/api/payout-hits?warId=${encodeURIComponent(warId)}`, {
-      headers: { 'X-Torn-Api-Key': key },
-    }).then(async (response) => {
-      const data = (await response.json()) as {
-        players?: Player[]
-        error?: string
-      }
-      if (!response.ok || data.error)
-        setError(data.error ?? 'Could not load war hits.')
-      else {
+    const controller = new AbortController()
+    setPlayers([])
+    async function loadPlayers() {
+      try {
+        const data = await fetchPayoutData<{ players?: Player[] }>(
+          `/api/payout-hits?warId=${encodeURIComponent(warId)}`,
+          key,
+          controller.signal,
+        )
         setError('')
         setPlayers(data.players ?? [])
+      } catch (requestError) {
+        if (!controller.signal.aborted) setError(errorMessage(requestError))
       }
-    })
+    }
+    void loadPlayers()
+    return () => controller.abort()
   }, [warId])
   const totalHits = players.reduce(
     (sum, player) =>
@@ -70,7 +71,7 @@ function Payouts() {
           (player.warHits + (includeNonWar ? player.nonWarHits : 0)) *
           appliedRate,
       })),
-    [appliedRate, players],
+    [appliedRate, includeNonWar, players],
   )
   const totalPaid = payouts.reduce((sum, player) => sum + player.amount, 0)
   const remainder = Math.max(0, earnings - totalPaid)
@@ -201,4 +202,39 @@ function money(value: number) {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function readPaidPayouts(): string[] {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem('tornintel.paidPayouts') ?? '[]',
+    ) as unknown
+    return Array.isArray(saved)
+      ? saved.filter((id): id is string => typeof id === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+async function fetchPayoutData<T>(
+  path: string,
+  apiKey: string,
+  signal: AbortSignal,
+): Promise<T> {
+  if (!apiKey) throw new Error('Connect a Torn API key first.')
+  const response = await fetch(path, {
+    cache: 'no-store',
+    headers: { 'X-Torn-Api-Key': apiKey },
+    signal,
+  })
+  const payload = (await response.json()) as T & { error?: string }
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error ?? 'Could not load payout data.')
+  }
+  return payload
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Could not load payout data.'
 }

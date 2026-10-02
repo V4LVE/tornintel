@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PayoutsRouteImport } from './routes/payouts'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiCombatBarsRouteImport } from './routes/api/combat-bars'
 import { Route as ApiFactionMembersRouteImport } from './routes/api/faction-members'
 import { Route as ApiPayoutHitsRouteImport } from './routes/api/payout-hits'
 import { Route as ApiUserRouteImport } from './routes/api/user'
@@ -30,6 +31,11 @@ const PayoutsRoute = PayoutsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCombatBarsRoute = ApiCombatBarsRouteImport.update({
+  id: '/api/combat-bars',
+  path: '/api/combat-bars',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFactionMembersRoute = ApiFactionMembersRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
+  '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
   '/api/user': typeof ApiUserRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
+  '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
   '/api/user': typeof ApiUserRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
+  '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
   '/api/user': typeof ApiUserRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/payouts'
     | '/settings'
+    | '/api/combat-bars'
     | '/api/faction-members'
     | '/api/payout-hits'
     | '/api/user'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/payouts'
     | '/settings'
+    | '/api/combat-bars'
     | '/api/faction-members'
     | '/api/payout-hits'
     | '/api/user'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/payouts'
     | '/settings'
+    | '/api/combat-bars'
     | '/api/faction-members'
     | '/api/payout-hits'
     | '/api/user'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PayoutsRoute: typeof PayoutsRoute
   SettingsRoute: typeof SettingsRoute
+  ApiCombatBarsRoute: typeof ApiCombatBarsRoute
   ApiFactionMembersRoute: typeof ApiFactionMembersRoute
   ApiPayoutHitsRoute: typeof ApiPayoutHitsRoute
   ApiUserRoute: typeof ApiUserRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/combat-bars': {
+      id: '/api/combat-bars'
+      path: '/api/combat-bars'
+      fullPath: '/api/combat-bars'
+      preLoaderRoute: typeof ApiCombatBarsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/faction-members': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PayoutsRoute: PayoutsRoute,
   SettingsRoute: SettingsRoute,
+  ApiCombatBarsRoute: ApiCombatBarsRoute,
   ApiFactionMembersRoute: ApiFactionMembersRoute,
   ApiPayoutHitsRoute: ApiPayoutHitsRoute,
   ApiUserRoute: ApiUserRoute,

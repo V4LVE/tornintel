@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
 import { verifyTornUser } from '#/lib/torn-user'
 import type { UserProfile } from '#/lib/torn-user'
+import type { ChainTargetResponse } from '#/lib/chain-target'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -74,6 +75,38 @@ function Home() {
   const [authenticationError, setAuthenticationError] = useState('')
   const [combatBars, setCombatBars] = useState<CombatBarsResponse | null>(null)
   const [combatBarsError, setCombatBarsError] = useState('')
+  const [chainTarget, setChainTarget] = useState<ChainTargetResponse | null>(
+    null,
+  )
+  const [chainTargetError, setChainTargetError] = useState('')
+  const [isFindingChainTarget, setIsFindingChainTarget] = useState(false)
+
+  async function findChainTarget() {
+    if (isFindingChainTarget) return
+    setIsFindingChainTarget(true)
+    setChainTargetError('')
+    const previousId = chainTarget?.target?.id
+    setChainTarget(null)
+    try {
+      const response = await fetch(
+        '/api/chain-target' + (previousId ? `?excludeId=${previousId}` : ''),
+        { cache: 'no-store', headers: { 'X-Torn-Api-Key': apiKey } },
+      )
+      const payload = (await response.json()) as ChainTargetResponse
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error ?? 'Unable to find a keep-alive target.')
+      }
+      setChainTarget(payload)
+    } catch (requestError) {
+      setChainTargetError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to find a keep-alive target.',
+      )
+    } finally {
+      setIsFindingChainTarget(false)
+    }
+  }
 
   const refreshCombatBars = useCallback(async (key: string) => {
     try {
@@ -301,6 +334,9 @@ function Home() {
     combatBars?.energy && combatBars.fetchedAt
       ? projectEnergy(combatBars.energy, combatBars.fetchedAt, clock)
       : null
+  const chainTargetFresh = Boolean(
+    chainTarget?.target && clock - chainTarget.fetchedAt < 30000,
+  )
 
   if (!hasInitialized || (isAuthenticating && !user)) {
     return <ApiKeyGate isLoading />
@@ -503,6 +539,72 @@ function Home() {
             {combatBarsError && (
               <p className="combat-error">{combatBarsError}</p>
             )}
+            <div className="chain-keep-alive">
+              <h3>Keep the chain alive</h3>
+              <p>
+                Find a random available player you beat in the last 14 days.
+              </p>
+              <button
+                className="refresh-button"
+                onClick={() => void findChainTarget()}
+                disabled={isFindingChainTarget}
+              >
+                {isFindingChainTarget
+                  ? 'Finding target…'
+                  : chainTarget?.target
+                    ? 'Find another target'
+                    : 'Find keep-alive target'}
+              </button>
+              <div aria-live="polite" aria-busy={isFindingChainTarget}>
+                {chainTarget?.target && (
+                  <div className="chain-target">
+                    <strong>{chainTarget.target.name}</strong>
+                    <span>
+                      #{chainTarget.target.id} · Level{' '}
+                      {chainTarget.target.level}
+                    </span>
+                    <span>
+                      Last beaten{' '}
+                      {new Date(
+                        chainTarget.target.lastWonAt,
+                      ).toLocaleDateString()}
+                      . Previous wins suggest you can beat them again.
+                    </span>
+                    {chainTargetFresh &&
+                    (!energyNow || energyNow.current >= 25) ? (
+                      <a
+                        className="attack-button"
+                        href={
+                          'https://www.torn.com/page.php?sid=attack&user2ID=' +
+                          chainTarget.target.id
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => {
+                          setChainTarget(null)
+                          window.setTimeout(
+                            () => void refreshCombatBars(apiKey),
+                            5000,
+                          )
+                        }}
+                      >
+                        Attack <span>&#8599;</span>
+                      </a>
+                    ) : (
+                      <span>
+                        {!chainTargetFresh
+                          ? 'Status check expired. Find a fresh target.'
+                          : 'You need 25 energy to attack.'}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {chainTarget?.message && <p>{chainTarget.message}</p>}
+                {chainTargetError && (
+                  <p className="combat-error">{chainTargetError}</p>
+                )}
+              </div>
+            </div>
           </section>
           <section className="panel combat-panel" aria-label="Energy bar">
             <div className="combat-heading">

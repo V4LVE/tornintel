@@ -510,6 +510,31 @@ button {
   color: #ef8167;
   font-size: 11px;
 }
+.chain-keep-alive {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #293741;
+}
+.chain-keep-alive h3 {
+  margin: 0;
+  color: #edf2f3;
+  font-size: 13px;
+}
+.chain-keep-alive p,
+.chain-target > span {
+  color: #82929d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.chain-target {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+.chain-target .attack-button {
+  justify-self: start;
+  margin-top: 4px;
+}
 .panel {
   border: 1px solid #293741;
   border-radius: 7px;

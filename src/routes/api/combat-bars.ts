@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
 
 type TornBar = {
   current: number
@@ -37,10 +38,8 @@ export const Route = createFileRoute('/api/combat-bars')({
         url.searchParams.set('key', apiKey)
 
         try {
-          const response = await fetch(url, { cache: 'no-store' })
-          if (!response.ok)
-            throw new Error(`Torn returned HTTP ${response.status}`)
-          const payload = (await response.json()) as TornBarsResponse
+          const { data: payload, fetchedAt } =
+            await fetchTorn<TornBarsResponse>(url, { maxAgeMs: 3000 })
           if (payload.error) {
             return Response.json(
               { error: payload.error.error },
@@ -63,7 +62,7 @@ export const Route = createFileRoute('/api/combat-bars')({
             {
               energy,
               chain: payload.bars?.chain ?? null,
-              fetchedAt: Date.now(),
+              fetchedAt,
             },
             { headers: { 'Cache-Control': 'no-store' } },
           )
@@ -73,7 +72,10 @@ export const Route = createFileRoute('/api/combat-bars')({
           })
           return Response.json(
             {
-              error: 'Unable to load your energy and chain. Try again shortly.',
+              error:
+                error instanceof TornApiError
+                  ? error.message
+                  : 'Unable to load your energy and chain. Try again shortly.',
             },
             { status: 502 },
           )

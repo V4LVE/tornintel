@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
 import {
   calculateBalanceFactor,
   calculateBattleStatScore,
@@ -98,12 +99,9 @@ export const Route = createFileRoute('/api/faction-members')({
         url.searchParams.set('key', apiKey)
 
         try {
-          const response = await fetch(url, { cache: 'no-store' })
-          if (!response.ok) {
-            throw new Error(`Torn returned HTTP ${response.status}`)
-          }
-
-          const faction = (await response.json()) as TornFactionResponse
+          const { data: faction } = await fetchTorn<TornFactionResponse>(url, {
+            maxAgeMs: 5000,
+          })
           if (faction.error) {
             console.error('[tornintel] Torn rejected faction request', {
               factionId,
@@ -152,7 +150,10 @@ export const Route = createFileRoute('/api/faction-members')({
           })
           return Response.json(
             {
-              error: 'Unable to reach Torn right now. Try refreshing shortly.',
+              error:
+                error instanceof TornApiError
+                  ? error.message
+                  : 'Unable to reach Torn right now. Try refreshing shortly.',
             },
             { status: 502 },
           )
@@ -225,14 +226,9 @@ async function loadFairFightEvidence(
   url.searchParams.set('key', apiKey)
 
   try {
-    const response = await fetch(url, { cache: 'no-store' })
-    if (!response.ok)
-      return emptyFairFightEvidence(`Torn returned HTTP ${response.status}.`)
-    const combat = (await response.json()) as TornCombatResponse
-    if (combat.error)
-      return emptyFairFightEvidence(
-        `Torn rejected the combat request (${combat.error.code}: ${combat.error.error}).`,
-      )
+    const { data: combat } = await fetchTorn<TornCombatResponse>(url, {
+      maxAgeMs: 120000,
+    })
     if (!combat.player_id)
       return emptyFairFightEvidence('Torn did not return your player ID.')
 
@@ -290,7 +286,9 @@ async function loadFairFightEvidence(
       message: error instanceof Error ? error.message : String(error),
     })
     return emptyFairFightEvidence(
-      'The combat request failed. Try syncing again.',
+      error instanceof TornApiError
+        ? `Torn rejected the combat request (${error.code ?? 'HTTP'}: ${error.message}).`
+        : 'The combat request failed. Try syncing again.',
     )
   }
 }

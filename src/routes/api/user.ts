@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
 
 type TornUserResponse = {
   player_id?: number
@@ -26,12 +27,9 @@ export const Route = createFileRoute('/api/user')({
         url.searchParams.set('key', apiKey)
 
         try {
-          const response = await fetch(url, { cache: 'no-store' })
-          if (!response.ok) {
-            throw new Error(`Torn returned HTTP ${response.status}`)
-          }
-
-          const user = (await response.json()) as TornUserResponse
+          const { data: user } = await fetchTorn<TornUserResponse>(url, {
+            maxAgeMs: 60000,
+          })
           if (user.error) {
             return Response.json({ error: user.error.error }, { status: 401 })
           }
@@ -59,8 +57,13 @@ export const Route = createFileRoute('/api/user')({
             message: error instanceof Error ? error.message : String(error),
           })
           return Response.json(
-            { error: 'Unable to reach Torn right now. Try again shortly.' },
-            { status: 502 },
+            {
+              error:
+                error instanceof TornApiError
+                  ? error.message
+                  : 'Unable to reach Torn right now. Try again shortly.',
+            },
+            { status: error instanceof TornApiError && error.code ? 401 : 502 },
           )
         }
       },

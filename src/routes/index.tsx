@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
 import { verifyTornUser } from '#/lib/torn-user'
 import type { UserProfile } from '#/lib/torn-user'
+import type { ChainTargetResponse } from '#/lib/chain-target'
+import { useVisiblePolling } from '#/lib/use-visible-polling'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -74,34 +76,87 @@ function Home() {
   const [authenticationError, setAuthenticationError] = useState('')
   const [combatBars, setCombatBars] = useState<CombatBarsResponse | null>(null)
   const [combatBarsError, setCombatBarsError] = useState('')
+  const [chainTarget, setChainTarget] = useState<ChainTargetResponse | null>(
+    null,
+  )
+  const [chainTargetError, setChainTargetError] = useState('')
+  const [isFindingChainTarget, setIsFindingChainTarget] = useState(false)
+  const targetRequest = useRef<{
+    id: string
+    controller: AbortController | null
+  }>({ id: '', controller: null })
+  const barsRequest = useRef<AbortController | null>(null)
+  const barsNeedRefresh = useRef(false)
 
-  const refreshCombatBars = useCallback(async (key: string) => {
+  async function findChainTarget() {
+    if (isFindingChainTarget) return
+    setIsFindingChainTarget(true)
+    setChainTargetError('')
+    const previousId = chainTarget?.target?.id
+    setChainTarget(null)
     try {
-      const response = await fetch('/api/combat-bars', {
-        cache: 'no-store',
-        headers: { 'X-Torn-Api-Key': key },
-      })
-      const payload = (await response.json()) as CombatBarsResponse
-      if (
-        !response.ok ||
-        payload.error ||
-        !payload.energy ||
-        !payload.fetchedAt
-      ) {
-        throw new Error(
-          payload.error ?? 'Unable to load energy and chain data.',
-        )
+      const response = await fetch(
+        '/api/chain-target' + (previousId ? `?excludeId=${previousId}` : ''),
+        { cache: 'no-store', headers: { 'X-Torn-Api-Key': apiKey } },
+      )
+      const payload = (await response.json()) as ChainTargetResponse
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error ?? 'Unable to find a keep-alive target.')
       }
-      setCombatBars(payload)
-      setCombatBarsError('')
+      setChainTarget(payload)
     } catch (requestError) {
-      setCombatBarsError(
+      setChainTargetError(
         requestError instanceof Error
           ? requestError.message
-          : 'Unable to load energy and chain data.',
+          : 'Unable to find a keep-alive target.',
       )
+    } finally {
+      setIsFindingChainTarget(false)
     }
-  }, [])
+  }
+
+  const refreshCombatBars = useCallback(
+    async (key: string, signal?: AbortSignal) => {
+      if (barsRequest.current && !barsRequest.current.signal.aborted) return
+      const controller = new AbortController()
+      barsRequest.current = controller
+      const requestSignal = signal
+        ? AbortSignal.any([signal, controller.signal])
+        : controller.signal
+      try {
+        const response = await fetch('/api/combat-bars', {
+          cache: 'no-store',
+          headers: { 'X-Torn-Api-Key': key },
+          signal: requestSignal,
+        })
+        const payload = (await response.json()) as CombatBarsResponse
+        if (requestSignal.aborted) return
+        if (
+          !response.ok ||
+          payload.error ||
+          !payload.energy ||
+          !payload.fetchedAt
+        ) {
+          throw new Error(
+            payload.error ?? 'Unable to load energy and chain data.',
+          )
+        }
+        setCombatBars(payload)
+        barsNeedRefresh.current = false
+        setCombatBarsError('')
+      } catch (requestError) {
+        if (requestSignal.aborted) return
+        setCombatBarsError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load energy and chain data.',
+        )
+      } finally {
+        if (barsRequest.current === controller) barsRequest.current = null
+      }
+    },
+    [],
+  )
 
   const authenticate = useCallback(async (key: string) => {
     const requestedApiKey = key.trim()
@@ -131,7 +186,11 @@ function Home() {
   }, [])
 
   const refreshTargets = useCallback(
-    async (idOverride = factionId, apiKeyOverride = apiKey) => {
+    async (
+      idOverride = factionId,
+      apiKeyOverride = apiKey,
+      signal?: AbortSignal,
+    ) => {
       const requestedFactionId = idOverride.trim()
       const requestedApiKey = apiKeyOverride.trim()
 
@@ -139,6 +198,20 @@ function Home() {
         setError('Enter your Torn API key to begin tracking.')
         return
       }
+
+      const requestId = requestedFactionId + ':' + requestedApiKey
+      if (
+        targetRequest.current.id === requestId &&
+        targetRequest.current.controller &&
+        !targetRequest.current.controller.signal.aborted
+      )
+        return
+      targetRequest.current.controller?.abort()
+      const controller = new AbortController()
+      targetRequest.current = { id: requestId, controller }
+      const requestSignal = signal
+        ? AbortSignal.any([signal, controller.signal])
+        : controller.signal
 
       setIsLoading(true)
       setError('')
@@ -150,9 +223,11 @@ function Home() {
           {
             cache: 'no-store',
             headers: { 'X-Torn-Api-Key': requestedApiKey },
+            signal: requestSignal,
           },
         )
         const payload = (await response.json()) as FactionMembersResponse
+        if (requestSignal.aborted) return
 
         if (!response.ok || payload.error) {
           throw new Error(payload.error ?? 'Unable to load faction members.')
@@ -171,6 +246,7 @@ function Home() {
         setSynced('Just now')
         setClock(Date.now())
       } catch (requestError) {
+        if (requestSignal.aborted) return
         const message =
           requestError instanceof Error
             ? requestError.message
@@ -181,7 +257,10 @@ function Home() {
         })
         setError(message)
       } finally {
-        setIsLoading(false)
+        if (targetRequest.current.controller === controller) {
+          targetRequest.current = { id: '', controller: null }
+          setIsLoading(false)
+        }
       }
     },
     [apiKey, factionId],
@@ -205,26 +284,30 @@ function Home() {
     if (savedApiKey) void authenticate(savedApiKey)
   }, [authenticate])
 
+  const pollTargets = useCallback(
+    (signal: AbortSignal) => refreshTargets(factionId, apiKey, signal),
+    [apiKey, factionId, refreshTargets],
+  )
+  const pollBars = useCallback(
+    (signal: AbortSignal) => refreshCombatBars(apiKey, signal),
+    [apiKey, refreshCombatBars],
+  )
+  useVisiblePolling(
+    pollTargets,
+    Boolean(hasInitialized && apiKey && user && !isPaused),
+  )
+  useVisiblePolling(pollBars, Boolean(hasInitialized && apiKey && user))
+
   useEffect(() => {
-    if (!hasInitialized || !apiKey || !user || isPaused) return
-
-    void refreshTargets()
-    const refreshTimer = window.setInterval(() => void refreshTargets(), 30000)
-
-    return () => {
-      window.clearInterval(refreshTimer)
+    function refreshAfterAttack() {
+      if (document.visibilityState === 'visible' && barsNeedRefresh.current) {
+        void refreshCombatBars(apiKey)
+      }
     }
-  }, [apiKey, hasInitialized, isPaused, refreshTargets, user])
-
-  useEffect(() => {
-    if (!hasInitialized || !apiKey || !user) return
-    void refreshCombatBars(apiKey)
-    const refreshTimer = window.setInterval(
-      () => void refreshCombatBars(apiKey),
-      30000,
-    )
-    return () => window.clearInterval(refreshTimer)
-  }, [apiKey, hasInitialized, refreshCombatBars, user])
+    document.addEventListener('visibilitychange', refreshAfterAttack)
+    return () =>
+      document.removeEventListener('visibilitychange', refreshAfterAttack)
+  }, [apiKey, refreshCombatBars])
 
   useEffect(() => {
     setClock(Date.now())
@@ -301,6 +384,9 @@ function Home() {
     combatBars?.energy && combatBars.fetchedAt
       ? projectEnergy(combatBars.energy, combatBars.fetchedAt, clock)
       : null
+  const chainTargetFresh = Boolean(
+    chainTarget?.target && clock - chainTarget.fetchedAt < 30000,
+  )
 
   if (!hasInitialized || (isAuthenticating && !user)) {
     return <ApiKeyGate isLoading />
@@ -503,6 +589,69 @@ function Home() {
             {combatBarsError && (
               <p className="combat-error">{combatBarsError}</p>
             )}
+            <div className="chain-keep-alive">
+              <h3>Keep the chain alive</h3>
+              <p>
+                Find a random available player you beat in the last 14 days.
+              </p>
+              <button
+                className="refresh-button"
+                onClick={() => void findChainTarget()}
+                disabled={isFindingChainTarget}
+              >
+                {isFindingChainTarget
+                  ? 'Finding target…'
+                  : chainTarget?.target
+                    ? 'Find another target'
+                    : 'Find keep-alive target'}
+              </button>
+              <div aria-live="polite" aria-busy={isFindingChainTarget}>
+                {chainTarget?.target && (
+                  <div className="chain-target">
+                    <strong>{chainTarget.target.name}</strong>
+                    <span>
+                      #{chainTarget.target.id} · Level{' '}
+                      {chainTarget.target.level}
+                    </span>
+                    <span>
+                      Last beaten{' '}
+                      {new Date(
+                        chainTarget.target.lastWonAt,
+                      ).toLocaleDateString()}
+                      . Previous wins suggest you can beat them again.
+                    </span>
+                    {chainTargetFresh &&
+                    (!energyNow || energyNow.current >= 25) ? (
+                      <a
+                        className="attack-button"
+                        href={
+                          'https://www.torn.com/page.php?sid=attack&user2ID=' +
+                          chainTarget.target.id
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => {
+                          setChainTarget(null)
+                          barsNeedRefresh.current = true
+                        }}
+                      >
+                        Attack <span>&#8599;</span>
+                      </a>
+                    ) : (
+                      <span>
+                        {!chainTargetFresh
+                          ? 'Status check expired. Find a fresh target.'
+                          : 'You need 25 energy to attack.'}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {chainTarget?.message && <p>{chainTarget.message}</p>}
+                {chainTargetError && (
+                  <p className="combat-error">{chainTargetError}</p>
+                )}
+              </div>
+            </div>
           </section>
           <section className="panel combat-panel" aria-label="Energy bar">
             <div className="combat-heading">
@@ -658,7 +807,7 @@ function Home() {
             <span>
               {isPaused
                 ? 'Hospital tracking paused'
-                : 'Auto-refreshes every 30 seconds'}
+                : 'Refreshes every 30 seconds while this tab is visible'}
             </span>
           </div>
         </section>
@@ -667,7 +816,7 @@ function Home() {
           and{' '}
           {isPaused
             ? 'War hospital tracking is paused.'
-            : 'is refreshed automatically every 30 seconds.'}
+            : 'is refreshed every 30 seconds while this tab is visible.'}
         </footer>
       </section>
     </main>

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import type { ChainTargetResponse } from '#/lib/chain-target'
+import { fetchTorn } from '#/lib/torn-api.server'
 
 type Attack = {
   attacker_id?: number
@@ -33,14 +34,14 @@ async function loadProfile(
   const url = new URL(`https://api.torn.com/user/${id}`)
   url.searchParams.set('selections', selections)
   url.searchParams.set('key', apiKey)
-  const response = await fetch(url, {
-    cache: 'no-store',
+  const { data: profile, fetchedAt } = await fetchTorn<Profile>(url, {
+    maxAgeMs: id ? 60000 : 10000,
     signal,
+    // Keep unavailable players out of repeated searches, but always recheck
+    // available players before offering an attack.
+    cacheWhen: (data) => !id || (data as Profile).status?.state !== 'Okay',
   })
-  if (!response.ok) throw new Error(`Torn returned HTTP ${response.status}.`)
-  const profile = (await response.json()) as Profile
-  if (profile.error) throw new Error(profile.error.error)
-  return profile
+  return { profile, fetchedAt }
 }
 
 export const Route = createFileRoute('/api/chain-target')({
@@ -57,7 +58,12 @@ export const Route = createFileRoute('/api/chain-target')({
 
         try {
           const signal = AbortSignal.timeout(20000)
-          const self = await loadProfile(apiKey, signal, '', 'profile,attacks')
+          const { profile: self } = await loadProfile(
+            apiKey,
+            signal,
+            '',
+            'profile,attacks',
+          )
           if (!self.player_id || !self.status) {
             throw new Error('Torn returned an incomplete hitter profile.')
           }
@@ -109,7 +115,11 @@ export const Route = createFileRoute('/api/chain-target')({
           }
 
           for (const [id, attack] of candidates.slice(0, MAX_PROFILE_CHECKS)) {
-            const profile = await loadProfile(apiKey, signal, String(id))
+            const { profile, fetchedAt } = await loadProfile(
+              apiKey,
+              signal,
+              String(id),
+            )
             if (
               profile.player_id !== id ||
               !profile.name ||
@@ -128,7 +138,7 @@ export const Route = createFileRoute('/api/chain-target')({
                   level: profile.level,
                   lastWonAt: attack.timestamp_ended! * 1000,
                 },
-                fetchedAt: Date.now(),
+                fetchedAt,
               } satisfies ChainTargetResponse,
               { headers: { 'Cache-Control': 'no-store' } },
             )

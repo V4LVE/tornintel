@@ -36,14 +36,14 @@ function Payouts() {
     return () => controller.abort()
   }, [])
   useEffect(() => {
-    if (!warId) return
+    setPlayers([])
+    if (!/^\d+$/.test(warId.trim())) return
     const key = localStorage.getItem('tornintel.apiKey') ?? ''
     const controller = new AbortController()
-    setPlayers([])
     async function loadPlayers() {
       try {
         const data = await fetchPayoutData<{ players?: Player[] }>(
-          `/api/payout-hits?warId=${encodeURIComponent(warId)}`,
+          `/api/payout-hits?warId=${encodeURIComponent(warId.trim())}`,
           key,
           controller.signal,
         )
@@ -53,8 +53,11 @@ function Payouts() {
         if (!controller.signal.aborted) setError(errorMessage(requestError))
       }
     }
-    void loadPlayers()
-    return () => controller.abort()
+    const timer = window.setTimeout(() => void loadPlayers(), 400)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
   }, [warId])
   const totalHits = players.reduce(
     (sum, player) =>

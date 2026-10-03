@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchTorn } from '#/lib/torn-api.server'
 
 type Player = { id: string; name: string; warHits: number; nonWarHits: number }
 type Attack = {
@@ -99,23 +100,21 @@ export const Route = createFileRoute('/api/payout-hits')({
 async function torn(path: string, key: string) {
   const url = new URL(`https://api.torn.com${path}`)
   url.searchParams.set('key', key)
-  const response = await fetch(url, { cache: 'no-store' })
-  const payload = (await response.json()) as { error?: { error?: string } }
-  if (!response.ok || payload.error)
-    throw new Error(payload.error?.error ?? 'Torn API request failed.')
-  return payload
+  const { data } = await fetchTorn(url, {
+    maxAgeMs: path.includes('/rankedwarreport') ? 300000 : 30000,
+  })
+  return data
 }
 
 async function tornV1Account(key: string) {
   const url = new URL('https://api.torn.com/user/')
   url.searchParams.set('selections', '')
   url.searchParams.set('key', key)
-  const response = await fetch(url, { cache: 'no-store' })
-  const payload = (await response.json()) as {
+  const { data: payload } = await fetchTorn<{
     faction?: { faction_id?: number }
     error?: { error?: string }
-  }
-  if (!response.ok || payload.error || !payload.faction?.faction_id) {
+  }>(url, { maxAgeMs: 60000 })
+  if (!payload.faction?.faction_id) {
     throw new Error(
       payload.error?.error ?? 'Could not load the signed-in faction.',
     )

@@ -100,7 +100,7 @@ test('returns an empty state when no qualifying wins exist', async () => {
       attacks: {},
     })
   try {
-    const response = await invoke()
+    const response = await invoke('empty-pool-key')
     const payload = await response.json()
     assert.equal(response.status, 200)
     assert.equal(payload.target, null)
@@ -115,7 +115,7 @@ test('surfaces Torn errors without returning a target', async () => {
   globalThis.fetch = async () =>
     Response.json({ error: { error: 'Too many requests' } })
   try {
-    const response = await invoke()
+    const response = await invoke('torn-error-key')
     assert.equal(response.status, 502)
     assert.equal((await response.json()).error, 'Too many requests')
   } finally {
@@ -145,9 +145,53 @@ test('caps profile checks when all candidates are unavailable', async () => {
     return Response.json({ status: { state: 'Hospital' } })
   }
   try {
-    const response = await invoke()
+    const response = await invoke('unavailable-pool-key')
     assert.equal((await response.json()).target, null)
     assert.equal(profileChecks, 10)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('reuses the hitter history, rechecks ready players, and remembers unavailable players', async () => {
+  const originalFetch = globalThis.fetch
+  const now = Math.floor(Date.now() / 1000) - 1
+  let selfCalls = 0
+  let targetCalls = 0
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/user/') {
+      selfCalls++
+      return Response.json({
+        player_id: 100,
+        status: { state: 'Okay' },
+        attacks: [
+          {
+            attacker_id: 100,
+            defender_id: 1,
+            timestamp_ended: now,
+            result: 'Mugged',
+          },
+        ],
+      })
+    }
+    targetCalls++
+    return Response.json({
+      player_id: 1,
+      name: 'Target',
+      level: 25,
+      status: { state: targetCalls === 1 ? 'Okay' : 'Hospital' },
+    })
+  }
+  try {
+    const first = await invoke('chain-cache-key')
+    assert.equal((await first.json()).target.id, 1)
+    const second = await invoke('chain-cache-key')
+    assert.equal((await second.json()).target, null)
+    const third = await invoke('chain-cache-key')
+    assert.equal((await third.json()).target, null)
+    assert.equal(selfCalls, 1)
+    assert.equal(targetCalls, 2)
   } finally {
     globalThis.fetch = originalFetch
   }

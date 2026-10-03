@@ -8,11 +8,12 @@ if (!handlers || typeof handlers === 'function') {
 }
 const handler = handlers.GET
 
-async function invokeRoute() {
+let nextKey = 0
+async function invokeRoute(key = `faction-test-${++nextKey}`) {
   if (!handler) throw new Error('Missing GET handler')
   const response = await handler({
     request: new Request('http://localhost/api/faction-members?factionId=123', {
-      headers: { 'x-torn-api-key': 'test-key' },
+      headers: { 'x-torn-api-key': key },
     }),
   } as never)
   if (!(response instanceof Response)) throw new Error('Expected a response')
@@ -88,6 +89,47 @@ test('reports the Torn error instead of blaming key permissions', async () => {
     const payload = await response.json()
     assert.equal(payload.fairFightStatus, 'UNAVAILABLE')
     assert.match(payload.fairFightReason, /Too many requests/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('refreshes hospital status while reusing slower-changing combat evidence', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+  const originalFetch = globalThis.fetch
+  let factionCalls = 0
+  let combatCalls = 0
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    if (url.pathname.startsWith('/faction/')) {
+      factionCalls++
+      return Response.json({
+        ID: 123,
+        name: 'Test faction',
+        tag: 'TEST',
+        members: {},
+      })
+    }
+    combatCalls++
+    return Response.json({
+      player_id: 789,
+      strength: 100,
+      speed: 100,
+      defense: 100,
+      dexterity: 100,
+      attacks: {},
+    })
+  }
+  try {
+    await invokeRoute('evidence-cache-key')
+    context.mock.timers.tick(30000)
+    await invokeRoute('evidence-cache-key')
+    assert.equal(factionCalls, 2)
+    assert.equal(combatCalls, 1)
+    context.mock.timers.tick(90000)
+    await invokeRoute('evidence-cache-key')
+    assert.equal(factionCalls, 3)
+    assert.equal(combatCalls, 2)
   } finally {
     globalThis.fetch = originalFetch
   }

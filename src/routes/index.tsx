@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
 import { verifyTornUser } from '#/lib/torn-user'
 import type { UserProfile } from '#/lib/torn-user'
 import type { ChainTargetResponse } from '#/lib/chain-target'
+import { useVisiblePolling } from '#/lib/use-visible-polling'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -80,6 +81,12 @@ function Home() {
   )
   const [chainTargetError, setChainTargetError] = useState('')
   const [isFindingChainTarget, setIsFindingChainTarget] = useState(false)
+  const targetRequest = useRef<{
+    id: string
+    controller: AbortController | null
+  }>({ id: '', controller: null })
+  const barsRequest = useRef<AbortController | null>(null)
+  const barsNeedRefresh = useRef(false)
 
   async function findChainTarget() {
     if (isFindingChainTarget) return
@@ -108,33 +115,48 @@ function Home() {
     }
   }
 
-  const refreshCombatBars = useCallback(async (key: string) => {
-    try {
-      const response = await fetch('/api/combat-bars', {
-        cache: 'no-store',
-        headers: { 'X-Torn-Api-Key': key },
-      })
-      const payload = (await response.json()) as CombatBarsResponse
-      if (
-        !response.ok ||
-        payload.error ||
-        !payload.energy ||
-        !payload.fetchedAt
-      ) {
-        throw new Error(
-          payload.error ?? 'Unable to load energy and chain data.',
+  const refreshCombatBars = useCallback(
+    async (key: string, signal?: AbortSignal) => {
+      if (barsRequest.current && !barsRequest.current.signal.aborted) return
+      const controller = new AbortController()
+      barsRequest.current = controller
+      const requestSignal = signal
+        ? AbortSignal.any([signal, controller.signal])
+        : controller.signal
+      try {
+        const response = await fetch('/api/combat-bars', {
+          cache: 'no-store',
+          headers: { 'X-Torn-Api-Key': key },
+          signal: requestSignal,
+        })
+        const payload = (await response.json()) as CombatBarsResponse
+        if (requestSignal.aborted) return
+        if (
+          !response.ok ||
+          payload.error ||
+          !payload.energy ||
+          !payload.fetchedAt
+        ) {
+          throw new Error(
+            payload.error ?? 'Unable to load energy and chain data.',
+          )
+        }
+        setCombatBars(payload)
+        barsNeedRefresh.current = false
+        setCombatBarsError('')
+      } catch (requestError) {
+        if (requestSignal.aborted) return
+        setCombatBarsError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load energy and chain data.',
         )
+      } finally {
+        if (barsRequest.current === controller) barsRequest.current = null
       }
-      setCombatBars(payload)
-      setCombatBarsError('')
-    } catch (requestError) {
-      setCombatBarsError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Unable to load energy and chain data.',
-      )
-    }
-  }, [])
+    },
+    [],
+  )
 
   const authenticate = useCallback(async (key: string) => {
     const requestedApiKey = key.trim()
@@ -164,7 +186,11 @@ function Home() {
   }, [])
 
   const refreshTargets = useCallback(
-    async (idOverride = factionId, apiKeyOverride = apiKey) => {
+    async (
+      idOverride = factionId,
+      apiKeyOverride = apiKey,
+      signal?: AbortSignal,
+    ) => {
       const requestedFactionId = idOverride.trim()
       const requestedApiKey = apiKeyOverride.trim()
 
@@ -172,6 +198,20 @@ function Home() {
         setError('Enter your Torn API key to begin tracking.')
         return
       }
+
+      const requestId = requestedFactionId + ':' + requestedApiKey
+      if (
+        targetRequest.current.id === requestId &&
+        targetRequest.current.controller &&
+        !targetRequest.current.controller.signal.aborted
+      )
+        return
+      targetRequest.current.controller?.abort()
+      const controller = new AbortController()
+      targetRequest.current = { id: requestId, controller }
+      const requestSignal = signal
+        ? AbortSignal.any([signal, controller.signal])
+        : controller.signal
 
       setIsLoading(true)
       setError('')
@@ -183,9 +223,11 @@ function Home() {
           {
             cache: 'no-store',
             headers: { 'X-Torn-Api-Key': requestedApiKey },
+            signal: requestSignal,
           },
         )
         const payload = (await response.json()) as FactionMembersResponse
+        if (requestSignal.aborted) return
 
         if (!response.ok || payload.error) {
           throw new Error(payload.error ?? 'Unable to load faction members.')
@@ -204,6 +246,7 @@ function Home() {
         setSynced('Just now')
         setClock(Date.now())
       } catch (requestError) {
+        if (requestSignal.aborted) return
         const message =
           requestError instanceof Error
             ? requestError.message
@@ -214,7 +257,10 @@ function Home() {
         })
         setError(message)
       } finally {
-        setIsLoading(false)
+        if (targetRequest.current.controller === controller) {
+          targetRequest.current = { id: '', controller: null }
+          setIsLoading(false)
+        }
       }
     },
     [apiKey, factionId],
@@ -238,26 +284,30 @@ function Home() {
     if (savedApiKey) void authenticate(savedApiKey)
   }, [authenticate])
 
+  const pollTargets = useCallback(
+    (signal: AbortSignal) => refreshTargets(factionId, apiKey, signal),
+    [apiKey, factionId, refreshTargets],
+  )
+  const pollBars = useCallback(
+    (signal: AbortSignal) => refreshCombatBars(apiKey, signal),
+    [apiKey, refreshCombatBars],
+  )
+  useVisiblePolling(
+    pollTargets,
+    Boolean(hasInitialized && apiKey && user && !isPaused),
+  )
+  useVisiblePolling(pollBars, Boolean(hasInitialized && apiKey && user))
+
   useEffect(() => {
-    if (!hasInitialized || !apiKey || !user || isPaused) return
-
-    void refreshTargets()
-    const refreshTimer = window.setInterval(() => void refreshTargets(), 30000)
-
-    return () => {
-      window.clearInterval(refreshTimer)
+    function refreshAfterAttack() {
+      if (document.visibilityState === 'visible' && barsNeedRefresh.current) {
+        void refreshCombatBars(apiKey)
+      }
     }
-  }, [apiKey, hasInitialized, isPaused, refreshTargets, user])
-
-  useEffect(() => {
-    if (!hasInitialized || !apiKey || !user) return
-    void refreshCombatBars(apiKey)
-    const refreshTimer = window.setInterval(
-      () => void refreshCombatBars(apiKey),
-      30000,
-    )
-    return () => window.clearInterval(refreshTimer)
-  }, [apiKey, hasInitialized, refreshCombatBars, user])
+    document.addEventListener('visibilitychange', refreshAfterAttack)
+    return () =>
+      document.removeEventListener('visibilitychange', refreshAfterAttack)
+  }, [apiKey, refreshCombatBars])
 
   useEffect(() => {
     setClock(Date.now())
@@ -582,10 +632,7 @@ function Home() {
                         rel="noreferrer"
                         onClick={() => {
                           setChainTarget(null)
-                          window.setTimeout(
-                            () => void refreshCombatBars(apiKey),
-                            5000,
-                          )
+                          barsNeedRefresh.current = true
                         }}
                       >
                         Attack <span>&#8599;</span>
@@ -760,7 +807,7 @@ function Home() {
             <span>
               {isPaused
                 ? 'Hospital tracking paused'
-                : 'Auto-refreshes every 30 seconds'}
+                : 'Refreshes every 30 seconds while this tab is visible'}
             </span>
           </div>
         </section>
@@ -769,7 +816,7 @@ function Home() {
           and{' '}
           {isPaused
             ? 'War hospital tracking is paused.'
-            : 'is refreshed automatically every 30 seconds.'}
+            : 'is refreshed every 30 seconds while this tab is visible.'}
         </footer>
       </section>
     </main>

@@ -1,5 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+import { syncTravelTracking } from '#/lib/travel.server'
+import type { MemberStatus, TravelEstimate } from '#/lib/travel'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
 import type {
   BattleStatContributor,
@@ -19,12 +21,7 @@ type TornMember = {
   name: string
   level: number
   last_action?: { relative?: string | number; status?: string }
-  status: {
-    description?: string
-    details?: string
-    state?: string
-    until?: number
-  }
+  status: MemberStatus
 }
 
 type TornFactionResponse = {
@@ -107,9 +104,10 @@ export const Route = createFileRoute('/api/faction-members')({
         url.searchParams.set('key', apiKey)
 
         try {
-          const { data: faction } = await fetchTorn<TornFactionResponse>(url, {
-            maxAgeMs: 5000,
-          })
+          const { data: faction, fetchedAt: statusObservedAt } =
+            await fetchTorn<TornFactionResponse>(url, {
+              maxAgeMs: 5000,
+            })
           if (faction.error) {
             console.error('[tornintel] Torn rejected faction request', {
               factionId,
@@ -123,6 +121,13 @@ export const Route = createFileRoute('/api/faction-members')({
           }
 
           const now = Date.now()
+          const travelTracking = await syncTravelTracking(
+            Object.entries(faction.members ?? {}).map(([playerId, member]) => ({
+              playerId,
+              status: member.status,
+            })),
+            statusObservedAt,
+          )
           const fairFightEvidence = await loadFairFightEvidence(apiKey, now)
           const sharedEvidence = await syncSharedEvidence(
             fairFightEvidence.evidence,
@@ -136,14 +141,25 @@ export const Route = createFileRoute('/api/faction-members')({
                 now,
                 sharedEvidence.observations.get(id) ?? [],
                 sharedEvidence.contributors.get(id) ?? [],
+                travelTracking.travel.get(id) ?? null,
               ),
             )
             .sort((left, right) => {
-              const statusOrder = { Ready: 0, 'In hospital': 1, Traveling: 2 }
+              const statusOrder = {
+                Ready: 0,
+                'In hospital': 1,
+                Traveling: 2,
+                Abroad: 3,
+                Unavailable: 4,
+              }
               const orderDifference =
                 statusOrder[left.status] - statusOrder[right.status]
 
-              return orderDifference || left.releaseAt - right.releaseAt
+              return (
+                orderDifference ||
+                (left.travel?.latestArrivalAt ?? left.releaseAt) -
+                  (right.travel?.latestArrivalAt ?? right.releaseAt)
+              )
             })
 
           return Response.json(
@@ -154,6 +170,8 @@ export const Route = createFileRoute('/api/faction-members')({
               fairFightReason: fairFightEvidence.reason,
               sharedTbsStatus: sharedEvidence.status,
               sharedTbsReason: sharedEvidence.reason,
+              travelTrackingReason: travelTracking.reason,
+              statusObservedAt,
               fetchedAt: now,
             },
             { headers: { 'Cache-Control': 'no-store' } },
@@ -184,6 +202,7 @@ function formatMember(
   now: number,
   fairFightObservations: FairFightObservation[],
   battleStatContributors: BattleStatContributor[],
+  travel: TravelEstimate | null,
 ) {
   const state = member.status.state ?? 'Unknown'
   const releaseAt = (member.status.until ?? 0) * 1000
@@ -192,7 +211,11 @@ function formatMember(
       ? 'In hospital'
       : state === 'Okay'
         ? 'Ready'
-        : 'Traveling'
+        : state === 'Traveling'
+          ? 'Traveling'
+          : state === 'Abroad'
+            ? 'Abroad'
+            : 'Unavailable'
   const remaining = releaseAt - now
   const lastSeen = member.last_action?.relative ?? member.last_action?.status
   const hospitalRecommended = status === 'Ready' && isOnline(lastSeen)
@@ -209,6 +232,7 @@ function formatMember(
     lastSeen: lastSeen === undefined ? 'Unknown' : String(lastSeen),
     hospitalRecommended,
     battleStatContributors,
+    travel,
     priority:
       status === 'Ready'
         ? 'High'
@@ -372,7 +396,7 @@ function parseBattleStats(combat: TornCombatResponse): BattleStats | null {
   return { strength, speed, defense, dexterity }
 }
 
-function stripHtml(value?: string) {
+function stripHtml(value?: string | null) {
   return (
     value
       ?.replace(/<[^>]*>/g, '')

@@ -3,6 +3,9 @@ import { test } from 'node:test'
 import { Route } from '../../routes/api/faction-members'
 import { sharedEvidenceRepository } from './shared-evidence.server'
 import type { SharedObservation } from './shared-evidence.server'
+import { travelTrackingRepository } from '../travel.server'
+import { observeTravel } from '../travel'
+import type { MemberStatus, TravelSnapshot } from '../travel'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function') {
@@ -27,6 +30,20 @@ test('shares captured TBS with another player even when their combat access fail
   const originalFetch = globalThis.fetch
   const originalDatabaseUrl = process.env.DATABASE_URL
   process.env.DATABASE_URL = 'postgresql://test'
+  context.mock.method(
+    travelTrackingRepository,
+    'sync',
+    async (
+      members: Array<{ playerId: string; status: { state?: string } }>,
+      observedAt: number,
+    ) =>
+      new Map(
+        members.map((member) => [
+          member.playerId,
+          observeTravel(member.status, observedAt),
+        ]),
+      ),
+  )
   const saved = new Map<string, SharedObservation>()
   context.mock.method(
     sharedEvidenceRepository,
@@ -143,6 +160,109 @@ test('rejects anonymous requests before reading shared evidence', async (context
   const response = await invokeRoute('')
   assert.equal(response.status, 401)
   assert.equal(load.mock.callCount(), 0)
+})
+
+test('serializes landing windows and distinguishes abroad, jail, and active flights', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
+  const originalFetch = globalThis.fetch
+  const originalDatabaseUrl = process.env.DATABASE_URL
+  process.env.DATABASE_URL = 'postgresql://test'
+  const snapshots = new Map<string, TravelSnapshot>()
+  context.mock.method(
+    travelTrackingRepository,
+    'sync',
+    async (
+      members: Array<{ playerId: string; status: MemberStatus }>,
+      observedAt: number,
+    ) => {
+      for (const member of members)
+        snapshots.set(
+          member.playerId,
+          observeTravel(
+            member.status,
+            observedAt,
+            snapshots.get(member.playerId),
+          ),
+        )
+      return snapshots
+    },
+  )
+  context.mock.method(sharedEvidenceRepository, 'save', async () => {})
+  context.mock.method(sharedEvidenceRepository, 'load', async () => [])
+  let departing = false
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    if (url.pathname.startsWith('/faction/')) {
+      return Response.json({
+        ID: 123,
+        name: 'Test',
+        tag: 'T',
+        members: {
+          801001: {
+            name: 'Returning',
+            level: 50,
+            status: departing
+              ? {
+                  state: 'Traveling',
+                  description: 'Returning from Canada',
+                  until: null,
+                }
+              : { state: 'Abroad', description: 'In Canada' },
+          },
+          801002: {
+            name: 'Abroad',
+            level: 50,
+            status: { state: 'Abroad', description: 'In Japan' },
+          },
+          801003: {
+            name: 'Jailed',
+            level: 50,
+            status: { state: 'Jail', until: Date.now() / 1000 + 600 },
+          },
+        },
+      })
+    }
+    return Response.json({ error: { code: 16, error: 'Access level too low' } })
+  }
+  try {
+    const before = await (await invokeRoute('flight-route-test')).json()
+    departing = true
+    context.mock.timers.tick(30000)
+    const after = await (await invokeRoute('flight-route-test')).json()
+    const returning = after.members.find(
+      (member: { id: string }) => member.id === '801001',
+    )
+    assert.equal(returning.status, 'Traveling')
+    assert.equal(returning.travel.direction, 'RETURNING')
+    assert.equal(returning.travel.country, 'Canada')
+    assert.equal(returning.travel.departureObserved, true)
+    assert.equal(returning.travel.firstSeenAt, after.statusObservedAt)
+    assert.equal(
+      returning.travel.earliestArrivalAt,
+      before.statusObservedAt + 9 * 0.97 * 60000,
+    )
+    assert.equal(
+      returning.travel.latestArrivalAt,
+      after.statusObservedAt + 39 * 1.03 * 60000,
+    )
+    const abroad = after.members.find(
+      (member: { id: string }) => member.id === '801002',
+    )
+    const jailed = after.members.find(
+      (member: { id: string }) => member.id === '801003',
+    )
+    assert.equal(abroad.status, 'Abroad')
+    assert.equal(abroad.travel, null)
+    assert.equal(jailed.status, 'Unavailable')
+    assert.equal(jailed.travel, null)
+    const cached = await (await invokeRoute('flight-route-test')).json()
+    assert.equal(cached.statusObservedAt, after.statusObservedAt)
+    assert.deepEqual(cached.members[0].travel, returning.travel)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL
+    else process.env.DATABASE_URL = originalDatabaseUrl
+  }
 })
 
 test('serializes an FF estimate from flat v1 battle stats', async () => {

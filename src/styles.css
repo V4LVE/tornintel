@@ -731,10 +731,12 @@ td {
 .status.ready i {
   background: #75d89d;
 }
-.status.traveling {
+.status.traveling,
+.status.abroad {
   color: #b5a0df;
 }
-.status.traveling i {
+.status.traveling i,
+.status.abroad i {
   background: #b5a0df;
 }
 .status + small {
@@ -759,6 +761,18 @@ td {
 }
 .ready-time {
   color: #77dba2;
+}
+.travel-timing {
+  display: grid;
+  gap: 5px;
+}
+.travel-timing strong {
+  color: #c4afea;
+}
+.travel-timing span,
+.travel-timing small {
+  color: #8a9ca8;
+  font-size: 10px;
 }
 .reason,
 .last-seen {

@@ -9,6 +9,12 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core'
 import type { FairFightObservation } from '../lib/battle-stats/estimator'
+import type { TravelSnapshot } from '../lib/travel'
+
+export const factionMemberTravel = pgTable('faction_member_travel', {
+  playerId: text('player_id').primaryKey(),
+  snapshot: jsonb().$type<TravelSnapshot>().notNull(),
+})
 
 export const sharedFairFightObservations = pgTable(
   'shared_fair_fight_observations',

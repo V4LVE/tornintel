@@ -40,6 +40,14 @@ npx tsc --noEmit
 npm run build
 ```
 
+## Opposing faction travel
+
+The member table tracks active flights inline, with live countdowns and estimated landing windows in the viewer's local time. Hover over the timing for UTC / Torn time. The Traveling filter shows flights, and the Abroad filter shows members who have already landed overseas.
+
+Departure observations are shared in PostgreSQL and survive server restarts. Tracking runs during dashboard syncs while a page is visible and unpaused; it does not monitor continuously when everyone closes the app. A departure seen between status syncs has a window that includes the polling interval. First sightings mid-flight or after a monitoring gap show departure unknown and only a broad upper arrival estimate.
+
+Torn does not expose opponents' private travel details through the viewer's key. Estimates use the [official travel times](https://wiki.torn.com/wiki/Travel), cover business through standard flights, the travel book, and 3% flight variance. Additional delays can fall outside the window. An elapsed countdown does not mark the member ready: the next Torn status must confirm landing. Hidden destinations have no invented countdown. Run `npm run db:migrate` when updating to create the shared travel tracking table; storage failures fall back to temporary tracking on the current server.
+
 ## Shared TBS storage
 
 Set `DATABASE_URL` to a PostgreSQL connection string in `.env.local` (or in the production server environment), then run `npm run db:migrate`. All app instances must use the same database to share estimates.

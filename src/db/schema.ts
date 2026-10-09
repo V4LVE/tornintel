@@ -1,5 +1,6 @@
 import {
   integer,
+  index,
   jsonb,
   pgTable,
   real,
@@ -7,6 +8,19 @@ import {
   text,
   timestamp,
 } from 'drizzle-orm/pg-core'
+import type { FairFightObservation } from '../lib/battle-stats/estimator'
+
+export const sharedFairFightObservations = pgTable(
+  'shared_fair_fight_observations',
+  {
+    evidenceId: text('evidence_id').primaryKey(),
+    playerId: text('player_id').notNull(),
+    sourcePlayerId: text('source_player_id').notNull(),
+    observation: jsonb().$type<FairFightObservation>().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [index('shared_ff_player_idx').on(table.playerId)],
+)
 
 export const todos = pgTable('todos', {
   id: serial().primaryKey(),

@@ -21,6 +21,7 @@ type Target = {
   hospitalRecommended: boolean
   priority: 'High' | 'Medium' | 'Low'
   battleStats: BattleStatsEstimate
+  battleStatContributors: string[]
 }
 
 type FactionMembersResponse = {
@@ -28,6 +29,8 @@ type FactionMembersResponse = {
   members: Target[]
   fairFightStatus: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
   fairFightReason?: string
+  sharedTbsStatus: 'READY' | 'UNAVAILABLE'
+  sharedTbsReason?: string
   fetchedAt: number
   error?: string
 }
@@ -61,6 +64,7 @@ function Home() {
     FactionMembersResponse['fairFightStatus'] | null
   >(null)
   const [fairFightReason, setFairFightReason] = useState('')
+  const [sharedTbsReason, setSharedTbsReason] = useState('')
   const [factionName, setFactionName] = useState('Enemy faction')
   const [synced, setSynced] = useState('Waiting for data')
   const [error, setError] = useState('')
@@ -236,6 +240,7 @@ function Home() {
         setTargets(payload.members)
         setFairFightStatus(payload.fairFightStatus)
         setFairFightReason(payload.fairFightReason ?? '')
+        setSharedTbsReason(payload.sharedTbsReason ?? '')
         setFactionName(payload.faction.name)
         setFactionId(String(payload.faction.id))
         setFactionInput(String(payload.faction.id))
@@ -735,14 +740,18 @@ function Home() {
           </div>
           {fairFightStatus === 'UNAVAILABLE' && (
             <p className="ff-evidence-note">
-              Fair Fight data is unavailable. {fairFightReason}
+              Your Fair Fight history is unavailable. {fairFightReason}{' '}
+              Previously shared estimates are still shown when available.
             </p>
           )}
           {fairFightStatus === 'NO_RECENT_FIGHTS' && (
             <p className="ff-evidence-note">
-              No recent fights were found. Torn cannot provide a Fair Fight
-              estimate for a player you have not fought.
+              No recent fights were found in your history. Shared estimates from
+              other players are shown when available.
             </p>
+          )}
+          {sharedTbsReason && (
+            <p className="ff-evidence-note">{sharedTbsReason}</p>
           )}
           <div className="toolbar">
             <div className="filter-tabs">
@@ -842,8 +851,9 @@ function ApiKeyGate({
         <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
         <p>
           Enter a Torn API key to use tornintel. A Limited key also lets us use
-          your recent Fair Fight history for battle-stat estimates. It stays in
-          this browser and is used only for your requests.
+          your recent Fair Fight history for battle-stat estimates shared with
+          other tornintel users. Your key stays in this browser and is sent to
+          the server to request Torn data.
         </p>
         {!isLoading && onSubmit && (
           <form
@@ -964,7 +974,10 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
         </div>
       </td>
       <td>
-        <BattleStatsCell estimate={target.battleStats} />
+        <BattleStatsCell
+          estimate={target.battleStats}
+          contributors={target.battleStatContributors}
+        />
       </td>
       <td>
         <span className={priorityClass}>
@@ -986,7 +999,22 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
   )
 }
 
-function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
+function BattleStatsCell({
+  estimate,
+  contributors = [],
+}: {
+  estimate: BattleStatsEstimate
+  contributors?: string[]
+}) {
+  const evidenceDetails =
+    estimate.newestEvidenceAt === null ? null : (
+      <span
+        title={`Contributed by Torn player IDs: ${contributors.join(', ')}`}
+      >
+        Recorded · {new Date(estimate.newestEvidenceAt).toLocaleDateString()}
+        {contributors.length > 0 && ` · by ${contributors.join(', ')}`}
+      </span>
+    )
   if (estimate.estimate === null) {
     const cappedBound = estimate.sources.includes('FAIR_FIGHT')
       ? estimate.lowerBound !== null && estimate.lowerBound > 0
@@ -1001,6 +1029,7 @@ function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
         <span className="battle-stats-method">
           {cappedBound ? 'Capped FF · bound only' : 'No recent FF evidence'}
         </span>
+        {evidenceDetails}
       </div>
     )
   }
@@ -1037,6 +1066,7 @@ function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
     <div className="battle-stats" title={estimate.explanation}>
       <strong>{range}</strong>
       <span className="battle-stats-method">{method}</span>
+      {evidenceDetails}
       <span>
         {bounds ? `${bounds} · ` : ''}
         {estimate.bss === null ? '' : `BSS ${Math.round(estimate.bss)} · `}

@@ -1,0 +1,1 @@
+ALTER TABLE "shared_fair_fight_observations" ADD COLUMN "source_player_name" text;

@@ -62,6 +62,7 @@ test('shares captured TBS with another player even when their combat access fail
     }
     return Response.json({
       player_id: 789,
+      name: 'Faction Hitter',
       strength: trained ? 4000000 : 1000000,
       speed: 1000000,
       defense: 1000000,
@@ -127,7 +128,9 @@ test('shares captured TBS with another player even when their combat access fail
       viewer.members[0].battleStats.newestEvidenceAt,
       timestamp * 1000,
     )
-    assert.deepEqual(viewer.members[0].battleStatContributors, ['789'])
+    assert.deepEqual(viewer.members[0].battleStatContributors, [
+      { id: '789', name: 'Faction Hitter' },
+    ])
   } finally {
     globalThis.fetch = originalFetch
     if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL

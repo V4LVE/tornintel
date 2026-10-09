@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
+import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
 import { verifyTornUser } from '#/lib/torn-user'
 import type { UserProfile } from '#/lib/torn-user'
 import type { ChainTargetResponse } from '#/lib/chain-target'
@@ -21,7 +22,7 @@ type Target = {
   hospitalRecommended: boolean
   priority: 'High' | 'Medium' | 'Low'
   battleStats: BattleStatsEstimate
-  battleStatContributors: string[]
+  battleStatContributors: BattleStatContributor[]
 }
 
 type FactionMembersResponse = {
@@ -1004,15 +1005,16 @@ function BattleStatsCell({
   contributors = [],
 }: {
   estimate: BattleStatsEstimate
-  contributors?: string[]
+  contributors?: BattleStatContributor[]
 }) {
+  const contributorNames = contributors
+    .map((contributor) => contributor.name || contributor.id)
+    .join(', ')
   const evidenceDetails =
     estimate.newestEvidenceAt === null ? null : (
-      <span
-        title={`Contributed by Torn player IDs: ${contributors.join(', ')}`}
-      >
+      <span title={`Contributed by: ${contributorNames}`}>
         Recorded · {new Date(estimate.newestEvidenceAt).toLocaleDateString()}
-        {contributors.length > 0 && ` · by ${contributors.join(', ')}`}
+        {contributors.length > 0 && ` · by ${contributorNames}`}
       </span>
     )
   if (estimate.estimate === null) {

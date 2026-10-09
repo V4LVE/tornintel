@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
-import type { SharedObservation } from '#/lib/battle-stats/shared-evidence.server'
+import type {
+  BattleStatContributor,
+  SharedObservation,
+} from '#/lib/battle-stats/shared-evidence.server'
 import {
   calculateBalanceFactor,
   calculateBattleStatScore,
@@ -47,6 +50,7 @@ type TornAttack = {
 
 type TornCombatResponse = {
   player_id?: number
+  name?: string
   // API v1 merges selections into the top-level response. API v2 nests them.
   strength?: TornBattleStat
   speed?: TornBattleStat
@@ -179,7 +183,7 @@ function formatMember(
   member: TornMember,
   now: number,
   fairFightObservations: FairFightObservation[],
-  battleStatContributors: string[],
+  battleStatContributors: BattleStatContributor[],
 ) {
   const state = member.status.state ?? 'Unknown'
   const releaseAt = (member.status.until ?? 0) * 1000
@@ -310,6 +314,7 @@ async function loadFairFightEvidence(
         evidenceId: `${combat.player_id}:${attackId}`,
         playerId: String(targetId),
         sourcePlayerId: String(combat.player_id),
+        sourcePlayerName: combat.name?.trim() || null,
         observation,
       })
       observations.set(String(targetId), targetObservations)

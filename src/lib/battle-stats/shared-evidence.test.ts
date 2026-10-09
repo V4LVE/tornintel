@@ -31,6 +31,9 @@ test('continues reading stored evidence when saving fails', async (context) => {
     assert.equal(result.status, 'UNAVAILABLE')
     assert.match(result.reason ?? '', /could not be saved/)
     assert.deepEqual(result.observations.get('456'), [evidence.observation])
+    assert.deepEqual(result.contributors.get('456'), [
+      { id: '789', name: null },
+    ])
   } finally {
     if (previous === undefined) delete process.env.DATABASE_URL
     else process.env.DATABASE_URL = previous

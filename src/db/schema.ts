@@ -16,6 +16,7 @@ export const sharedFairFightObservations = pgTable(
     evidenceId: text('evidence_id').primaryKey(),
     playerId: text('player_id').notNull(),
     sourcePlayerId: text('source_player_id').notNull(),
+    sourcePlayerName: text('source_player_name'),
     observation: jsonb().$type<FairFightObservation>().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

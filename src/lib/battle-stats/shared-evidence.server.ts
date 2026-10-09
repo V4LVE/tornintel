@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm'
+import { inArray, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { sharedFairFightObservations } from '#/db/schema'
 import type { FairFightObservation } from './estimator'
@@ -7,8 +7,11 @@ export type SharedObservation = {
   evidenceId: string
   playerId: string
   sourcePlayerId: string
+  sourcePlayerName?: string | null
   observation: FairFightObservation
 }
+
+export type BattleStatContributor = { id: string; name: string | null }
 
 // Save only server-fetched combat evidence, never client-supplied estimates or keys.
 export const sharedEvidenceRepository = {
@@ -18,7 +21,12 @@ export const sharedEvidenceRepository = {
     await db
       .insert(sharedFairFightObservations)
       .values(evidence)
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: sharedFairFightObservations.evidenceId,
+        set: {
+          sourcePlayerName: sql`coalesce(excluded.source_player_name, ${sharedFairFightObservations.sourcePlayerName})`,
+        },
+      })
   },
   async load(playerIds: string[]): Promise<SharedObservation[]> {
     if (playerIds.length === 0) return []
@@ -56,14 +64,23 @@ export async function syncSharedEvidence(
     if (reason) console.warn('[tornintel] Shared TBS storage failed')
   }
   const observations = new Map<string, FairFightObservation[]>()
-  const contributors = new Map<string, string[]>()
+  const contributors = new Map<string, BattleStatContributor[]>()
   for (const item of combined.values()) {
     const target = observations.get(item.playerId) ?? []
     target.push(item.observation)
     observations.set(item.playerId, target)
     const sources = contributors.get(item.playerId) ?? []
-    if (!sources.includes(item.sourcePlayerId))
-      sources.push(item.sourcePlayerId)
+    const contributor = sources.find(
+      (source) => source.id === item.sourcePlayerId,
+    )
+    if (!contributor) {
+      sources.push({
+        id: item.sourcePlayerId,
+        name: item.sourcePlayerName ?? null,
+      })
+    } else if (item.sourcePlayerName) {
+      contributor.name = item.sourcePlayerName
+    }
     contributors.set(item.playerId, sources)
   }
   return {

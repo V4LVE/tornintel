@@ -37,12 +37,19 @@ test(
       await sharedEvidenceRepository.save([
         {
           ...evidence,
+          sourcePlayerName: 'Faction Hitter',
           observation: { ...evidence.observation, attackerBss: 8000 },
         },
       ])
       const loaded = await sharedEvidenceRepository.load([playerId])
       assert.equal(loaded.length, 1)
       assert.deepEqual(loaded[0].observation, evidence.observation)
+      assert.equal(loaded[0].sourcePlayerName, 'Faction Hitter')
+      await sharedEvidenceRepository.save([evidence])
+      assert.equal(
+        (await sharedEvidenceRepository.load([playerId]))[0].sourcePlayerName,
+        'Faction Hitter',
+      )
       assert.deepEqual(
         await sharedEvidenceRepository.load([`${playerId}:other`]),
         [],

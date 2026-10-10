@@ -12,11 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PayoutsRouteImport } from './routes/payouts'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as WarDealsRouteImport } from './routes/war-deals'
 import { Route as ApiChainTargetRouteImport } from './routes/api/chain-target'
 import { Route as ApiCombatBarsRouteImport } from './routes/api/combat-bars'
 import { Route as ApiFactionMembersRouteImport } from './routes/api/faction-members'
 import { Route as ApiPayoutHitsRouteImport } from './routes/api/payout-hits'
 import { Route as ApiUserRouteImport } from './routes/api/user'
+import { Route as ApiWarDealDefaultsRouteImport } from './routes/api/war-deal-defaults'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -32,6 +34,11 @@ const PayoutsRoute = PayoutsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WarDealsRoute = WarDealsRouteImport.update({
+  id: '/war-deals',
+  path: '/war-deals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChainTargetRoute = ApiChainTargetRouteImport.update({
@@ -59,6 +66,11 @@ const ApiUserRoute = ApiUserRouteImport.update({
   path: '/api/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWarDealDefaultsRoute = ApiWarDealDefaultsRouteImport.update({
+  id: '/api/war-deal-defaults',
+  path: '/api/war-deal-defaults',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -69,22 +81,26 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
+  '/war-deals': typeof WarDealsRoute
   '/api/chain-target': typeof ApiChainTargetRoute
   '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
   '/api/user': typeof ApiUserRoute
+  '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
+  '/war-deals': typeof WarDealsRoute
   '/api/chain-target': typeof ApiChainTargetRoute
   '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
   '/api/user': typeof ApiUserRoute
+  '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -92,11 +108,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
+  '/war-deals': typeof WarDealsRoute
   '/api/chain-target': typeof ApiChainTargetRoute
   '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
   '/api/user': typeof ApiUserRoute
+  '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
@@ -105,33 +123,39 @@ export interface FileRouteTypes {
     | '/'
     | '/payouts'
     | '/settings'
+    | '/war-deals'
     | '/api/chain-target'
     | '/api/combat-bars'
     | '/api/faction-members'
     | '/api/payout-hits'
     | '/api/user'
+    | '/api/war-deal-defaults'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/payouts'
     | '/settings'
+    | '/war-deals'
     | '/api/chain-target'
     | '/api/combat-bars'
     | '/api/faction-members'
     | '/api/payout-hits'
     | '/api/user'
+    | '/api/war-deal-defaults'
     | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/payouts'
     | '/settings'
+    | '/war-deals'
     | '/api/chain-target'
     | '/api/combat-bars'
     | '/api/faction-members'
     | '/api/payout-hits'
     | '/api/user'
+    | '/api/war-deal-defaults'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -139,11 +163,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PayoutsRoute: typeof PayoutsRoute
   SettingsRoute: typeof SettingsRoute
+  WarDealsRoute: typeof WarDealsRoute
   ApiChainTargetRoute: typeof ApiChainTargetRoute
   ApiCombatBarsRoute: typeof ApiCombatBarsRoute
   ApiFactionMembersRoute: typeof ApiFactionMembersRoute
   ApiPayoutHitsRoute: typeof ApiPayoutHitsRoute
   ApiUserRoute: typeof ApiUserRoute
+  ApiWarDealDefaultsRoute: typeof ApiWarDealDefaultsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -168,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/war-deals': {
+      id: '/war-deals'
+      path: '/war-deals'
+      fullPath: '/war-deals'
+      preLoaderRoute: typeof WarDealsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chain-target': {
@@ -205,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/war-deal-defaults': {
+      id: '/api/war-deal-defaults'
+      path: '/api/war-deal-defaults'
+      fullPath: '/api/war-deal-defaults'
+      preLoaderRoute: typeof ApiWarDealDefaultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -219,11 +259,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PayoutsRoute: PayoutsRoute,
   SettingsRoute: SettingsRoute,
+  WarDealsRoute: WarDealsRoute,
   ApiChainTargetRoute: ApiChainTargetRoute,
   ApiCombatBarsRoute: ApiCombatBarsRoute,
   ApiFactionMembersRoute: ApiFactionMembersRoute,
   ApiPayoutHitsRoute: ApiPayoutHitsRoute,
   ApiUserRoute: ApiUserRoute,
+  ApiWarDealDefaultsRoute: ApiWarDealDefaultsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

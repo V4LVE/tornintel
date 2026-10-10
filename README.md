@@ -22,6 +22,7 @@ npm start
 
 - `src/routes/index.tsx`: hospital dashboard and live chain and energy panels.
 - `src/routes/payouts.tsx`: ranked war payout calculator.
+- `src/routes/war-deals.tsx`: war deal planning and editable proposals for both outcomes. With a saved API key, faction names, current war target, item market prices, and each faction's latest completed cache rewards load automatically. Cache counts are a labeled historical baseline, not a prediction for the entered scores; all values can be adjusted manually. Compensation uses the losing faction's score, with whole items and a cash remainder. Payment wording appears only when a rate or timing is supplied. Manual planning remains available without an API key at `/war-deals`.
 - `src/routes/settings.tsx`: API key and connected account settings.
 - `src/routes/api/`: server endpoints that request Torn data.
 - `src/lib/battle-stats/`: Fair Fight based estimates and tests.

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
@@ -439,6 +439,9 @@ function Home() {
           <a className="nav-item" href="/payouts">
             <span className="nav-icon">$</span> War payout
           </a>
+          <Link className="nav-item" to="/war-deals">
+            <span className="nav-icon">↔</span> War deals
+          </Link>
           <a className="nav-item" href="#intel">
             <span className="nav-icon">i</span> Intel reports
             <span className="soon">Soon</span>

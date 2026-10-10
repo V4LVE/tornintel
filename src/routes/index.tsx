@@ -1,7 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
+import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
+import type { TravelEstimate } from '#/lib/travel'
 import { verifyTornUser } from '#/lib/torn-user'
 import type { UserProfile } from '#/lib/torn-user'
 import type { ChainTargetResponse } from '#/lib/chain-target'
@@ -13,7 +15,7 @@ type Target = {
   id: string
   name: string
   level: number
-  status: 'Ready' | 'In hospital' | 'Traveling'
+  status: 'Ready' | 'In hospital' | 'Traveling' | 'Abroad' | 'Unavailable'
   detail: string
   releaseAt: number
   reason: string
@@ -21,6 +23,8 @@ type Target = {
   hospitalRecommended: boolean
   priority: 'High' | 'Medium' | 'Low'
   battleStats: BattleStatsEstimate
+  battleStatContributors: BattleStatContributor[]
+  travel: TravelEstimate | null
 }
 
 type FactionMembersResponse = {
@@ -28,6 +32,10 @@ type FactionMembersResponse = {
   members: Target[]
   fairFightStatus: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
   fairFightReason?: string
+  sharedTbsStatus: 'READY' | 'UNAVAILABLE'
+  sharedTbsReason?: string
+  travelTrackingReason?: string
+  statusObservedAt: number
   fetchedAt: number
   error?: string
 }
@@ -51,7 +59,13 @@ type CombatBarsResponse = {
   error?: string
 }
 
-const filters = ['All targets', 'In hospital', 'Ready', 'Traveling'] as const
+const filters = [
+  'All targets',
+  'In hospital',
+  'Ready',
+  'Traveling',
+  'Abroad',
+] as const
 
 function Home() {
   const [filter, setFilter] = useState<(typeof filters)[number]>('All targets')
@@ -61,6 +75,8 @@ function Home() {
     FactionMembersResponse['fairFightStatus'] | null
   >(null)
   const [fairFightReason, setFairFightReason] = useState('')
+  const [sharedTbsReason, setSharedTbsReason] = useState('')
+  const [travelTrackingReason, setTravelTrackingReason] = useState('')
   const [factionName, setFactionName] = useState('Enemy faction')
   const [synced, setSynced] = useState('Waiting for data')
   const [error, setError] = useState('')
@@ -236,6 +252,8 @@ function Home() {
         setTargets(payload.members)
         setFairFightStatus(payload.fairFightStatus)
         setFairFightReason(payload.fairFightReason ?? '')
+        setSharedTbsReason(payload.sharedTbsReason ?? '')
+        setTravelTrackingReason(payload.travelTrackingReason ?? '')
         setFactionName(payload.faction.name)
         setFactionId(String(payload.faction.id))
         setFactionInput(String(payload.faction.id))
@@ -310,9 +328,19 @@ function Home() {
   }, [apiKey, refreshCombatBars])
 
   useEffect(() => {
-    setClock(Date.now())
-    const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
-    return () => window.clearInterval(clockTimer)
+    let clockTimer: ReturnType<typeof setInterval> | undefined
+    function updateVisibility() {
+      clearInterval(clockTimer)
+      if (document.visibilityState === 'hidden') return
+      setClock(Date.now())
+      clockTimer = setInterval(() => setClock(Date.now()), 1000)
+    }
+    updateVisibility()
+    document.addEventListener('visibilitychange', updateVisibility)
+    return () => {
+      clearInterval(clockTimer)
+      document.removeEventListener('visibilitychange', updateVisibility)
+    }
   }, [])
 
   function trackFaction(event: FormEvent<HTMLFormElement>) {
@@ -365,14 +393,18 @@ function Home() {
         .sort((left, right) => left.releaseAt - right.releaseAt),
     [targets],
   )
-  const readyTargets = targets.filter((target) => target.status === 'Ready')
+  const readyTargets = useMemo(
+    () => targets.filter((target) => target.status === 'Ready'),
+    [targets],
+  )
   const nextRelease = hospitalTargets.at(0)
   const hospitalExitsSoon = hospitalTargets.filter(
     (target) => target.releaseAt - clock <= 600000,
   ).length
-  const onlineReadyTargets = readyTargets.filter((target) =>
-    target.lastSeen.includes('0 minutes'),
-  ).length
+  const onlineReadyTargets = useMemo(
+    () => readyTargets.filter((target) => target.hospitalRecommended).length,
+    [readyTargets],
+  )
   const chainDeadline =
     combatBars?.chain && combatBars.fetchedAt
       ? combatBars.fetchedAt + combatBars.chain.timeout * 1000
@@ -421,6 +453,9 @@ function Home() {
           <a className="nav-item" href="/payouts">
             <span className="nav-icon">$</span> War payout
           </a>
+          <Link className="nav-item" to="/war-deals">
+            <span className="nav-icon">↔</span> War deals
+          </Link>
           <a className="nav-item" href="#intel">
             <span className="nav-icon">i</span> Intel reports
             <span className="soon">Soon</span>
@@ -721,8 +756,8 @@ function Home() {
             <div>
               <h2>Opposing members</h2>
               <p>
-                Live member status from {factionName}. Stat estimates require a
-                usable Fair Fight score from your recent fights.
+                Live member status from {factionName}. Stat estimates use
+                personal and shared Fair Fight evidence.
               </p>
             </div>
             <button
@@ -735,15 +770,23 @@ function Home() {
           </div>
           {fairFightStatus === 'UNAVAILABLE' && (
             <p className="ff-evidence-note">
-              Fair Fight data is unavailable. {fairFightReason}
+              Your Fair Fight history is unavailable. {fairFightReason}{' '}
+              Previously shared estimates are still shown when available.
             </p>
           )}
           {fairFightStatus === 'NO_RECENT_FIGHTS' && (
             <p className="ff-evidence-note">
-              No recent fights were found. Torn cannot provide a Fair Fight
-              estimate for a player you have not fought.
+              No recent fights were found in your history. Shared estimates from
+              other players are shown when available.
             </p>
           )}
+          {sharedTbsReason && (
+            <p className="ff-evidence-note">{sharedTbsReason}</p>
+          )}
+          {travelTrackingReason &&
+            targets.some((target) => target.status === 'Traveling') && (
+              <p className="ff-evidence-note">{travelTrackingReason}</p>
+            )}
           <div className="toolbar">
             <div className="filter-tabs">
               {filters.map((item) => (
@@ -774,7 +817,7 @@ function Home() {
                 <tr>
                   <th>MEMBER</th>
                   <th>STATUS</th>
-                  <th>RELEASES IN</th>
+                  <th>RELEASE / LANDING</th>
                   <th>REASON</th>
                   <th>LAST SEEN</th>
                   <th>EST. TBS</th>
@@ -842,8 +885,9 @@ function ApiKeyGate({
         <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
         <p>
           Enter a Torn API key to use tornintel. A Limited key also lets us use
-          your recent Fair Fight history for battle-stat estimates. It stays in
-          this browser and is used only for your requests.
+          your recent Fair Fight history for battle-stat estimates shared with
+          other tornintel users. Your key stays in this browser and is sent to
+          the server to request Torn data.
         </p>
         {!isLoading && onSubmit && (
           <form
@@ -939,17 +983,25 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
         <small>{target.detail}</small>
       </td>
       <td>
-        <strong
-          className={
-            target.status === 'Ready' || release === 'Ready' ? 'ready-time' : ''
-          }
-        >
-          {release}
-        </strong>
-        {target.status === 'In hospital' && release !== 'Ready' && (
-          <div className="release-bar">
-            <i style={{ width: String(width) + '%' }} />
-          </div>
+        {target.status === 'Traveling' ? (
+          <TravelTiming travel={target.travel} clock={clock} />
+        ) : (
+          <>
+            <strong
+              className={
+                target.status === 'Ready' || release === 'Ready'
+                  ? 'ready-time'
+                  : ''
+              }
+            >
+              {release}
+            </strong>
+            {target.status === 'In hospital' && release !== 'Ready' && (
+              <div className="release-bar">
+                <i style={{ width: String(width) + '%' }} />
+              </div>
+            )}
+          </>
         )}
       </td>
       <td>
@@ -964,7 +1016,10 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
         </div>
       </td>
       <td>
-        <BattleStatsCell estimate={target.battleStats} />
+        <BattleStatsCell
+          estimate={target.battleStats}
+          contributors={target.battleStatContributors}
+        />
       </td>
       <td>
         <span className={priorityClass}>
@@ -986,7 +1041,86 @@ function TargetRow({ target, clock }: { target: Target; clock: number }) {
   )
 }
 
-function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
+function TravelTiming({
+  travel,
+  clock,
+}: {
+  travel: TravelEstimate | null
+  clock: number
+}) {
+  if (!travel || travel.latestArrivalAt === null) {
+    return (
+      <div className="travel-timing">
+        <strong>Landing unknown</strong>
+        <span>Route or timing is hidden</span>
+      </div>
+    )
+  }
+  const latest = travel.latestArrivalAt
+  const earliest = travel.earliestArrivalAt ?? latest
+  const elapsed = clock >= latest
+  const countdown = elapsed
+    ? 'Awaiting landing confirmation'
+    : travel.timing === 'REPORTED'
+      ? formatCountdown(latest, clock)
+      : !travel.departureObserved
+        ? `Up to ${formatCountdown(latest, clock)} (est.)`
+        : clock >= earliest
+          ? `Window open · ${formatCountdown(latest, clock)} left (est.)`
+          : `${formatCountdown(earliest, clock)}–${formatCountdown(latest, clock)} (est.)`
+  const window =
+    travel.timing === 'REPORTED'
+      ? `Lands ${formatArrivalTime(latest)}`
+      : travel.departureObserved
+        ? `${formatArrivalTime(earliest)}–${formatArrivalTime(latest)}`
+        : `Estimated by ${formatArrivalTime(latest)}`
+  return (
+    <div
+      className="travel-timing"
+      title={`Arrival in Torn time (UTC): ${new Date(earliest).toUTCString()} – ${new Date(latest).toUTCString()}. Estimates exclude extra flight delays; actual status must confirm landing.`}
+    >
+      <strong>{countdown}</strong>
+      <span>{window}</span>
+      <small>
+        {elapsed
+          ? 'Still reported traveling; estimate may be overdue.'
+          : travel.timing === 'REPORTED'
+            ? 'Arrival reported by Torn'
+            : travel.departureObserved
+              ? 'Departure observed · flight class unknown'
+              : 'First seen mid-flight · departure unknown'}
+      </small>
+    </div>
+  )
+}
+
+function formatArrivalTime(timestamp: number) {
+  return new Date(timestamp).toLocaleString(undefined, {
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  })
+}
+
+function BattleStatsCell({
+  estimate,
+  contributors = [],
+}: {
+  estimate: BattleStatsEstimate
+  contributors?: BattleStatContributor[]
+}) {
+  const contributorNames = contributors
+    .map((contributor) => contributor.name || contributor.id)
+    .join(', ')
+  const evidenceDetails =
+    estimate.newestEvidenceAt === null ? null : (
+      <span title={`Contributed by: ${contributorNames}`}>
+        Recorded · {new Date(estimate.newestEvidenceAt).toLocaleDateString()}
+        {contributors.length > 0 && ` · by ${contributorNames}`}
+      </span>
+    )
   if (estimate.estimate === null) {
     const cappedBound = estimate.sources.includes('FAIR_FIGHT')
       ? estimate.lowerBound !== null && estimate.lowerBound > 0
@@ -1001,6 +1135,7 @@ function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
         <span className="battle-stats-method">
           {cappedBound ? 'Capped FF · bound only' : 'No recent FF evidence'}
         </span>
+        {evidenceDetails}
       </div>
     )
   }
@@ -1037,6 +1172,7 @@ function BattleStatsCell({ estimate }: { estimate: BattleStatsEstimate }) {
     <div className="battle-stats" title={estimate.explanation}>
       <strong>{range}</strong>
       <span className="battle-stats-method">{method}</span>
+      {evidenceDetails}
       <span>
         {bounds ? `${bounds} · ` : ''}
         {estimate.bss === null ? '' : `BSS ${Math.round(estimate.bss)} · `}

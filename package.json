@@ -1,6 +1,7 @@
 {
   "name": "tornintel",
   "private": true,
+  "packageManager": "npm@12.2.0",
   "type": "module",
   "imports": {
     "#/*": "./src/*"
@@ -22,37 +23,37 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@heroui/react": "^3.2.5",
-    "@heroui/styles": "^3.2.5",
-    "@tailwindcss/vite": "^4.1.18",
-    "@tanstack/react-devtools": "latest",
-    "@tanstack/react-router": "latest",
-    "@tanstack/react-router-devtools": "latest",
-    "@tanstack/react-start": "latest",
-    "better-auth": "^1.5.3",
-    "drizzle-kit": "^0.31.9",
-    "drizzle-orm": "^0.45.1",
+    "@heroui/react": "^3.2.6",
+    "@heroui/styles": "^3.2.6",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-devtools": "^0.10.13",
+    "@tanstack/react-router": "^1.170.42",
+    "@tanstack/react-router-devtools": "^1.167.2",
+    "@tanstack/react-start": "^1.168.61",
+    "better-auth": "^1.7.7",
+    "drizzle-orm": "^0.45.4",
     "nitro": "^3.0.260903-beta",
-    "pg": "^8.16.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tailwindcss": "^4.1.18"
+    "pg": "^8.23.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@tanstack/devtools-vite": "latest",
-    "@tanstack/eslint-config": "latest",
-    "@tanstack/router-cli": "^1.132.0",
-    "@types/node": "^22.10.2",
-    "@types/pg": "^8.15.6",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.0.1",
-    "dotenv": "^17.3.1",
-    "eslint": "^9.20.0",
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
-    "vite": "^8.0.0"
+    "@tanstack/devtools-vite": "^0.8.5",
+    "@tanstack/eslint-config": "^0.4.0",
+    "@tanstack/router-cli": "^1.167.41",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "dotenv": "^18.0.7",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -64,5 +65,11 @@
     "skills": [
       "*"
     ]
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "unrs-resolver@1.12.2": true
   }
 }

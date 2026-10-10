@@ -1,5 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+import { syncTravelTracking } from '#/lib/travel.server'
+import type { MemberStatus, TravelEstimate } from '#/lib/travel'
+import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
+import type {
+  BattleStatContributor,
+  SharedObservation,
+} from '#/lib/battle-stats/shared-evidence.server'
 import {
   calculateBalanceFactor,
   calculateBattleStatScore,
@@ -14,12 +21,7 @@ type TornMember = {
   name: string
   level: number
   last_action?: { relative?: string | number; status?: string }
-  status: {
-    description?: string
-    details?: string
-    state?: string
-    until?: number
-  }
+  status: MemberStatus
 }
 
 type TornFactionResponse = {
@@ -33,17 +35,19 @@ type TornFactionResponse = {
 type TornBattleStat = number | string | { value?: number | string }
 
 type TornAttack = {
+  id?: number | string
   attacker_id?: number
   defender_id?: number
   timestamp_ended?: number
   timestamp_started?: number
-  modifiers?: { fair_fight?: number }
+  modifiers?: { fair_fight?: number; group_attack?: number }
   result?: string
   is_interrupted?: boolean
 }
 
 type TornCombatResponse = {
   player_id?: number
+  name?: string
   // API v1 merges selections into the top-level response. API v2 nests them.
   strength?: TornBattleStat
   speed?: TornBattleStat
@@ -59,6 +63,7 @@ type TornCombatResponse = {
   error?: { error: string; code: number }
 }
 type FairFightLoad = {
+  evidence: SharedObservation[]
   observations: Map<string, FairFightObservation[]>
   status: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
   reason?: string
@@ -99,9 +104,10 @@ export const Route = createFileRoute('/api/faction-members')({
         url.searchParams.set('key', apiKey)
 
         try {
-          const { data: faction } = await fetchTorn<TornFactionResponse>(url, {
-            maxAgeMs: 5000,
-          })
+          const { data: faction, fetchedAt: statusObservedAt } =
+            await fetchTorn<TornFactionResponse>(url, {
+              maxAgeMs: 5000,
+            })
           if (faction.error) {
             console.error('[tornintel] Torn rejected faction request', {
               factionId,
@@ -115,22 +121,55 @@ export const Route = createFileRoute('/api/faction-members')({
           }
 
           const now = Date.now()
-          const fairFightEvidence = await loadFairFightEvidence(apiKey, now)
-          const members = Object.entries(faction.members ?? {})
+          const entries = Object.entries(faction.members ?? {})
+          const [travelTracking, { fairFightEvidence, sharedEvidence }] =
+            await Promise.all([
+              syncTravelTracking(
+                entries.map(([playerId, member]) => ({
+                  playerId,
+                  status: member.status,
+                })),
+                statusObservedAt,
+              ),
+              (async () => {
+                const loadedEvidence = await loadFairFightEvidence(apiKey, now)
+                const syncedEvidence = await syncSharedEvidence(
+                  loadedEvidence.evidence,
+                  entries.map(([id]) => id),
+                )
+                return {
+                  fairFightEvidence: loadedEvidence,
+                  sharedEvidence: syncedEvidence,
+                }
+              })(),
+            ])
+          const members = entries
             .map(([id, member]) =>
               formatMember(
                 id,
                 member,
                 now,
-                fairFightEvidence.observations.get(id) ?? [],
+                sharedEvidence.observations.get(id) ?? [],
+                sharedEvidence.contributors.get(id) ?? [],
+                travelTracking.travel.get(id) ?? null,
               ),
             )
             .sort((left, right) => {
-              const statusOrder = { Ready: 0, 'In hospital': 1, Traveling: 2 }
+              const statusOrder = {
+                Ready: 0,
+                'In hospital': 1,
+                Traveling: 2,
+                Abroad: 3,
+                Unavailable: 4,
+              }
               const orderDifference =
                 statusOrder[left.status] - statusOrder[right.status]
 
-              return orderDifference || left.releaseAt - right.releaseAt
+              return (
+                orderDifference ||
+                (left.travel?.latestArrivalAt ?? left.releaseAt) -
+                  (right.travel?.latestArrivalAt ?? right.releaseAt)
+              )
             })
 
           return Response.json(
@@ -139,6 +178,10 @@ export const Route = createFileRoute('/api/faction-members')({
               members,
               fairFightStatus: fairFightEvidence.status,
               fairFightReason: fairFightEvidence.reason,
+              sharedTbsStatus: sharedEvidence.status,
+              sharedTbsReason: sharedEvidence.reason,
+              travelTrackingReason: travelTracking.reason,
+              statusObservedAt,
               fetchedAt: now,
             },
             { headers: { 'Cache-Control': 'no-store' } },
@@ -168,6 +211,8 @@ function formatMember(
   member: TornMember,
   now: number,
   fairFightObservations: FairFightObservation[],
+  battleStatContributors: BattleStatContributor[],
+  travel: TravelEstimate | null,
 ) {
   const state = member.status.state ?? 'Unknown'
   const releaseAt = (member.status.until ?? 0) * 1000
@@ -176,7 +221,11 @@ function formatMember(
       ? 'In hospital'
       : state === 'Okay'
         ? 'Ready'
-        : 'Traveling'
+        : state === 'Traveling'
+          ? 'Traveling'
+          : state === 'Abroad'
+            ? 'Abroad'
+            : 'Unavailable'
   const remaining = releaseAt - now
   const lastSeen = member.last_action?.relative ?? member.last_action?.status
   const hospitalRecommended = status === 'Ready' && isOnline(lastSeen)
@@ -192,6 +241,8 @@ function formatMember(
       stripHtml(member.status.details) || member.status.description || state,
     lastSeen: lastSeen === undefined ? 'Unknown' : String(lastSeen),
     hospitalRecommended,
+    battleStatContributors,
+    travel,
     priority:
       status === 'Ready'
         ? 'High'
@@ -239,13 +290,13 @@ async function loadFairFightEvidence(
       )
     const attackerBss = calculateBattleStatScore(stats)
     const attackerBalanceFactor = calculateBalanceFactor(stats)
-    const attacks = Array.isArray(combat.attacks)
-      ? combat.attacks
-      : Object.values(combat.attacks ?? {})
+    const attacks = Object.entries(combat.attacks ?? {})
+    const evidence: SharedObservation[] = []
     const observations = new Map<string, FairFightObservation[]>()
-    for (const attack of attacks) {
+    for (const [entryId, attack] of attacks) {
       if (
         attack.is_interrupted ||
+        (attack.modifiers?.group_attack ?? 1) > 1 ||
         (attack.result &&
           !['Hospitalized', 'Mugged', 'Attacked', 'Left'].includes(
             attack.result,
@@ -258,14 +309,26 @@ async function loadFairFightEvidence(
       const targetId = outgoing ? attack.defender_id : attack.attacker_id
       const fairFight = attack.modifiers?.fair_fight
       const timestamp =
-        (attack.timestamp_ended ?? attack.timestamp_started ?? now / 1000) *
-        1000
+        (attack.timestamp_ended ?? attack.timestamp_started ?? 0) * 1000
       // We only know the signed-in player's current stats, so do not use
       // older fights as if those stats were known at the time.
-      if (timestamp < now - CURRENT_PLAYER_STATS_WINDOW) continue
-      if (!targetId || !fairFight) continue
+      if (
+        !Number.isFinite(timestamp) ||
+        timestamp < now - CURRENT_PLAYER_STATS_WINDOW ||
+        timestamp > now
+      )
+        continue
+      if (
+        !targetId ||
+        !fairFight ||
+        !Number.isFinite(fairFight) ||
+        fairFight < 1 ||
+        fairFight > 3 ||
+        attackerBss <= 0
+      )
+        continue
       const targetObservations = observations.get(String(targetId)) ?? []
-      targetObservations.push({
+      const observation: FairFightObservation = {
         targetId: String(targetId),
         attackerId: String(attack.attacker_id ?? 'self'),
         attackerBss,
@@ -274,11 +337,25 @@ async function loadFairFightEvidence(
         fairFight,
         timestamp,
         attackerStatsExact: false,
+      }
+      targetObservations.push(observation)
+      const attackId =
+        attack.id ??
+        (Array.isArray(combat.attacks)
+          ? `${attack.attacker_id}:${attack.defender_id}:${timestamp}`
+          : entryId)
+      evidence.push({
+        evidenceId: `${combat.player_id}:${attackId}`,
+        playerId: String(targetId),
+        sourcePlayerId: String(combat.player_id),
+        sourcePlayerName: combat.name?.trim() || null,
+        observation,
       })
       observations.set(String(targetId), targetObservations)
     }
     return {
       observations,
+      evidence,
       status: observations.size ? 'READY' : 'NO_RECENT_FIGHTS',
     }
   } catch (error) {
@@ -294,7 +371,12 @@ async function loadFairFightEvidence(
 }
 
 function emptyFairFightEvidence(reason: string): FairFightLoad {
-  return { observations: new Map(), status: 'UNAVAILABLE', reason }
+  return {
+    observations: new Map(),
+    evidence: [],
+    status: 'UNAVAILABLE',
+    reason,
+  }
 }
 
 function parseBattleStats(combat: TornCombatResponse): BattleStats | null {
@@ -324,7 +406,7 @@ function parseBattleStats(combat: TornCombatResponse): BattleStats | null {
   return { strength, speed, defense, dexterity }
 }
 
-function stripHtml(value?: string) {
+function stripHtml(value?: string | null) {
   return (
     value
       ?.replace(/<[^>]*>/g, '')

@@ -433,7 +433,7 @@ export function estimateBattleStats(input: {
         input.spy?.timestamp,
         input.rankEvidence?.timestamp,
       ]),
-      explanation: `Weighted median of ${accepted.length} uncapped Fair Fight observation${accepted.length === 1 ? '' : 's'} gives the target's battle stat score. The total-stat point estimate assumes ${attackerFactors.length ? 'the target has a stat distribution like your own' : factors.calibrated ? 'the calibrated stat distribution' : 'a roughly balanced stat distribution'}; a different build can change the total substantially.`,
+      explanation: `Weighted median of ${accepted.length} uncapped Fair Fight observation${accepted.length === 1 ? '' : 's'} gives the target's battle stat score. The total-stat point estimate assumes ${attackerFactors.length ? 'the target has a stat distribution like the contributing players' : factors.calibrated ? 'the calibrated stat distribution' : 'a roughly balanced stat distribution'}; a different build can change the total substantially.`,
       warnings: [
         'Total battle stats depend on stat distribution.',
         ...(!factors.calibrated
@@ -648,7 +648,7 @@ export function estimateBattleStats(input: {
     newestEvidenceAt: null,
     explanation:
       weakEstimate === null
-        ? 'No usable Fair Fight score has been recorded for this player in your recent attacks or defenses.'
+        ? 'No usable personal or shared Fair Fight score has been recorded for this player.'
         : hasCalibratedMetadata
           ? 'Age and level were compared with a 200-player calibration dataset; this remains a population estimate, not direct battle-stat evidence.'
           : 'A deliberately broad population prior is shown because no direct evidence is available; level does not reliably predict battle stats.',

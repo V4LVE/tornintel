@@ -25,6 +25,52 @@ async function invokeRoute(key = `faction-test-${++nextKey}`) {
   return response
 }
 
+test('loads combat evidence while travel storage is still pending', async (context) => {
+  const originalDatabaseUrl = process.env.DATABASE_URL
+  process.env.DATABASE_URL = 'postgresql://test'
+  let releaseTravel!: () => void
+  const travelGate = new Promise<void>((resolve) => {
+    releaseTravel = resolve
+  })
+  let combatStarted = false
+  context.mock.method(travelTrackingRepository, 'sync', async () => {
+    await travelGate
+    return new Map<string, TravelSnapshot>()
+  })
+  context.mock.method(sharedEvidenceRepository, 'save', async () => {})
+  context.mock.method(sharedEvidenceRepository, 'load', async () => [])
+  context.mock.method(
+    globalThis,
+    'fetch',
+    async (input: string | URL | Request) => {
+      if (new URL(String(input)).pathname.startsWith('/faction/')) {
+        return Response.json({ ID: 123, name: 'Test', tag: 'T', members: {} })
+      }
+      combatStarted = true
+      return Response.json({
+        player_id: 789,
+        strength: 100,
+        speed: 100,
+        defense: 100,
+        dexterity: 100,
+        attacks: {},
+      })
+    },
+  )
+  const response = invokeRoute()
+  try {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.equal(combatStarted, true)
+    releaseTravel()
+    assert.equal((await response).status, 200)
+  } finally {
+    releaseTravel()
+    await response
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL
+    else process.env.DATABASE_URL = originalDatabaseUrl
+  }
+})
+
 test('shares captured TBS with another player even when their combat access fails', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: Date.now() })
   const originalFetch = globalThis.fetch

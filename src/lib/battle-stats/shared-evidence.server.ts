@@ -26,6 +26,7 @@ export const sharedEvidenceRepository = {
         set: {
           sourcePlayerName: sql`coalesce(excluded.source_player_name, ${sharedFairFightObservations.sourcePlayerName})`,
         },
+        setWhere: sql`excluded.source_player_name is not null and excluded.source_player_name is distinct from ${sharedFairFightObservations.sourcePlayerName}`,
       })
   },
   async load(playerIds: string[]): Promise<SharedObservation[]> {

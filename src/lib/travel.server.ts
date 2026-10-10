@@ -47,13 +47,20 @@ export const travelTrackingRepository = {
         playerId,
         snapshot: observeTravel(status, observedAt, previous.get(playerId)),
       }))
-      await tx
-        .insert(factionMemberTravel)
-        .values(updated)
-        .onConflictDoUpdate({
-          target: factionMemberTravel.playerId,
-          set: { snapshot: sql`excluded.snapshot` },
-        })
+      // observeTravel returns the existing snapshot for duplicate or stale data.
+      // Keep the row locks, but avoid rewriting those rows for every viewer.
+      const changed = updated.filter(
+        (row) => row.snapshot !== previous.get(row.playerId),
+      )
+      if (changed.length > 0) {
+        await tx
+          .insert(factionMemberTravel)
+          .values(changed)
+          .onConflictDoUpdate({
+            target: factionMemberTravel.playerId,
+            set: { snapshot: sql`excluded.snapshot` },
+          })
+      }
       return new Map(updated.map((row) => [row.playerId, row.snapshot]))
     })
   },

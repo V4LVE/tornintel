@@ -121,19 +121,29 @@ export const Route = createFileRoute('/api/faction-members')({
           }
 
           const now = Date.now()
-          const travelTracking = await syncTravelTracking(
-            Object.entries(faction.members ?? {}).map(([playerId, member]) => ({
-              playerId,
-              status: member.status,
-            })),
-            statusObservedAt,
-          )
-          const fairFightEvidence = await loadFairFightEvidence(apiKey, now)
-          const sharedEvidence = await syncSharedEvidence(
-            fairFightEvidence.evidence,
-            Object.keys(faction.members ?? {}),
-          )
-          const members = Object.entries(faction.members ?? {})
+          const entries = Object.entries(faction.members ?? {})
+          const [travelTracking, { fairFightEvidence, sharedEvidence }] =
+            await Promise.all([
+              syncTravelTracking(
+                entries.map(([playerId, member]) => ({
+                  playerId,
+                  status: member.status,
+                })),
+                statusObservedAt,
+              ),
+              (async () => {
+                const loadedEvidence = await loadFairFightEvidence(apiKey, now)
+                const syncedEvidence = await syncSharedEvidence(
+                  loadedEvidence.evidence,
+                  entries.map(([id]) => id),
+                )
+                return {
+                  fairFightEvidence: loadedEvidence,
+                  sharedEvidence: syncedEvidence,
+                }
+              })(),
+            ])
+          const members = entries
             .map(([id, member]) =>
               formatMember(
                 id,

@@ -53,6 +53,27 @@ test(
         .where(eq(factionMemberTravel.playerId, playerId))
       assert.equal(saved[0].snapshot.observedAt, start + 90000)
       assert.equal(saved[0].snapshot.firstSeenAt, start + 30000)
+      const version = async () => {
+        const result = await db.$client.query(
+          'select xmin::text as version from faction_member_travel where player_id = $1',
+          [playerId],
+        )
+        return result.rows[0].version
+      }
+      const before = await version()
+      await travelTrackingRepository.sync(
+        [{ playerId, status: flight }],
+        start + 90000,
+      )
+      await travelTrackingRepository.sync(
+        [{ playerId, status: { state: 'Abroad' } }],
+        start,
+      )
+      assert.equal(
+        await version(),
+        before,
+        'cached statuses should not be rewritten',
+      )
     } finally {
       await db
         .delete(factionMemberTravel)

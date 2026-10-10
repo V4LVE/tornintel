@@ -45,7 +45,23 @@ test(
       assert.equal(loaded.length, 1)
       assert.deepEqual(loaded[0].observation, evidence.observation)
       assert.equal(loaded[0].sourcePlayerName, 'Faction Hitter')
+      const version = async () => {
+        const result = await db.$client.query(
+          'select xmin::text as version from shared_fair_fight_observations where evidence_id = $1',
+          [evidence.evidenceId],
+        )
+        return result.rows[0].version
+      }
+      const before = await version()
       await sharedEvidenceRepository.save([evidence])
+      await sharedEvidenceRepository.save([
+        { ...evidence, sourcePlayerName: 'Faction Hitter' },
+      ])
+      assert.equal(
+        await version(),
+        before,
+        'unchanged hits should not be rewritten',
+      )
       assert.equal(
         (await sharedEvidenceRepository.load([playerId]))[0].sourcePlayerName,
         'Faction Hitter',

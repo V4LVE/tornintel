@@ -328,9 +328,19 @@ function Home() {
   }, [apiKey, refreshCombatBars])
 
   useEffect(() => {
-    setClock(Date.now())
-    const clockTimer = window.setInterval(() => setClock(Date.now()), 1000)
-    return () => window.clearInterval(clockTimer)
+    let clockTimer: ReturnType<typeof setInterval> | undefined
+    function updateVisibility() {
+      clearInterval(clockTimer)
+      if (document.visibilityState === 'hidden') return
+      setClock(Date.now())
+      clockTimer = setInterval(() => setClock(Date.now()), 1000)
+    }
+    updateVisibility()
+    document.addEventListener('visibilitychange', updateVisibility)
+    return () => {
+      clearInterval(clockTimer)
+      document.removeEventListener('visibilitychange', updateVisibility)
+    }
   }, [])
 
   function trackFaction(event: FormEvent<HTMLFormElement>) {
@@ -383,14 +393,18 @@ function Home() {
         .sort((left, right) => left.releaseAt - right.releaseAt),
     [targets],
   )
-  const readyTargets = targets.filter((target) => target.status === 'Ready')
+  const readyTargets = useMemo(
+    () => targets.filter((target) => target.status === 'Ready'),
+    [targets],
+  )
   const nextRelease = hospitalTargets.at(0)
   const hospitalExitsSoon = hospitalTargets.filter(
     (target) => target.releaseAt - clock <= 600000,
   ).length
-  const onlineReadyTargets = readyTargets.filter((target) =>
-    target.lastSeen.includes('0 minutes'),
-  ).length
+  const onlineReadyTargets = useMemo(
+    () => readyTargets.filter((target) => target.hospitalRecommended).length,
+    [readyTargets],
+  )
   const chainDeadline =
     combatBars?.chain && combatBars.fetchedAt
       ? combatBars.fetchedAt + combatBars.chain.timeout * 1000

@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   index,
   jsonb,
@@ -68,3 +69,17 @@ export const battleStatCalibrationSamples = pgTable(
     sampleSize: integer('sample_size').default(1),
   },
 )
+
+// Shared changes to the bundled levelling lists: players added from FF Scouter
+// discovery, and players removed because they are no longer useful targets.
+export const levellingListChanges = pgTable('levelling_list_changes', {
+  playerId: integer('player_id').primaryKey(),
+  name: text().notNull(),
+  level: integer().notNull(),
+  totalEstimate: real('total_estimate'),
+  removed: boolean().notNull().default(false),
+  addedById: integer('added_by_id'),
+  addedByName: text('added_by_name'),
+  changedById: integer('changed_by_id').notNull(),
+  changedAt: timestamp('changed_at').defaultNow().notNull(),
+})

@@ -22,6 +22,13 @@
       "when": 1791559625756,
       "tag": "0002_hot_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791839522562,
+      "tag": "0003_shiny_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

@@ -1,21 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { resolveEnemyFaction } from '#/lib/enemy-faction.server'
+import type { EnemyFaction } from '#/lib/enemy-faction.server'
 import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
 import { syncTravelTracking } from '#/lib/travel.server'
 import type { MemberStatus, TravelEstimate } from '#/lib/travel'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
-import type {
-  BattleStatContributor,
-  SharedObservation,
-} from '#/lib/battle-stats/shared-evidence.server'
-import {
-  calculateBalanceFactor,
-  calculateBattleStatScore,
-  estimateBattleStats,
-} from '#/lib/battle-stats/estimator'
-import type {
-  BattleStats,
-  FairFightObservation,
-} from '#/lib/battle-stats/estimator'
+import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
+import { estimateBattleStats } from '#/lib/battle-stats/estimator'
+import type { FairFightObservation } from '#/lib/battle-stats/estimator'
+import { loadFairFightEvidence } from '#/lib/battle-stats/fair-fight-evidence.server'
 
 type TornMember = {
   name: string
@@ -32,57 +25,18 @@ type TornFactionResponse = {
   error?: { error: string; code: number }
 }
 
-type TornBattleStat = number | string | { value?: number | string }
-
-type TornAttack = {
-  id?: number | string
-  attacker_id?: number
-  defender_id?: number
-  timestamp_ended?: number
-  timestamp_started?: number
-  modifiers?: { fair_fight?: number; group_attack?: number }
-  result?: string
-  is_interrupted?: boolean
-}
-
-type TornCombatResponse = {
-  player_id?: number
-  name?: string
-  // API v1 merges selections into the top-level response. API v2 nests them.
-  strength?: TornBattleStat
-  speed?: TornBattleStat
-  defense?: TornBattleStat
-  dexterity?: TornBattleStat
-  battlestats?: {
-    strength?: TornBattleStat
-    speed?: TornBattleStat
-    defense?: TornBattleStat
-    dexterity?: TornBattleStat
-  }
-  attacks?: Record<string, TornAttack> | TornAttack[]
-  error?: { error: string; code: number }
-}
-type FairFightLoad = {
-  evidence: SharedObservation[]
-  observations: Map<string, FairFightObservation[]>
-  status: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
-  reason?: string
-}
 const THIRTY_MINUTES = 30 * 60 * 1000
-const CURRENT_PLAYER_STATS_WINDOW = 14 * 24 * 60 * 60 * 1000
 
 export const Route = createFileRoute('/api/faction-members')({
   server: {
     handlers: {
       GET: async ({ request }) => {
         const apiKey = request.headers.get('x-torn-api-key')?.trim()
-        const requestedFactionId = new URL(request.url).searchParams.get(
-          'factionId',
-        )
-        const factionId =
-          requestedFactionId || process.env.TORN_ENEMY_FACTION_ID || '56833'
+        const requestedFactionId = new URL(request.url).searchParams
+          .get('factionId')
+          ?.trim()
 
-        if (!/^\d{1,10}$/.test(factionId)) {
+        if (requestedFactionId && !/^\d{1,10}$/.test(requestedFactionId)) {
           console.warn('[tornintel] Rejected invalid faction ID', {
             factionId: requestedFactionId,
           })
@@ -98,6 +52,33 @@ export const Route = createFileRoute('/api/faction-members')({
             { status: 401 },
           )
         }
+
+        let resolved: EnemyFaction | null
+        try {
+          resolved = requestedFactionId
+            ? { id: requestedFactionId, source: 'manual' }
+            : await resolveEnemyFaction(apiKey)
+        } catch (error) {
+          return Response.json(
+            {
+              error:
+                error instanceof TornApiError
+                  ? error.message
+                  : 'Unable to find your ranked war opponent.',
+            },
+            { status: error instanceof TornApiError ? 401 : 502 },
+          )
+        }
+        if (!resolved) {
+          return Response.json(
+            {
+              error:
+                'No ranked war found for your faction. Enter a faction ID to track.',
+            },
+            { status: 404 },
+          )
+        }
+        const factionId = resolved.id
 
         const url = new URL(`https://api.torn.com/faction/${factionId}`)
         url.searchParams.set('selections', '')
@@ -174,7 +155,12 @@ export const Route = createFileRoute('/api/faction-members')({
 
           return Response.json(
             {
-              faction: { id: faction.ID, name: faction.name, tag: faction.tag },
+              faction: {
+                id: faction.ID,
+                name: faction.name,
+                tag: faction.tag,
+                source: resolved.source,
+              },
               members,
               fairFightStatus: fairFightEvidence.status,
               fairFightReason: fairFightEvidence.reason,
@@ -264,146 +250,6 @@ function isOnline(lastSeen: string | number | undefined) {
     (typeof lastSeen === 'string' &&
       /^0\s*(?:minutes?|mins?|m)?(?:\s+ago)?$/i.test(lastSeen.trim()))
   )
-}
-
-async function loadFairFightEvidence(
-  apiKey: string,
-  now: number,
-): Promise<FairFightLoad> {
-  // v1 is intentionally used here because the application already uses it and
-  // it lets a limited key request its own stats and detailed attacks together.
-  const url = new URL('https://api.torn.com/user/')
-  url.searchParams.set('selections', 'profile,battlestats,attacks')
-  url.searchParams.set('key', apiKey)
-
-  try {
-    const { data: combat } = await fetchTorn<TornCombatResponse>(url, {
-      maxAgeMs: 120000,
-    })
-    if (!combat.player_id)
-      return emptyFairFightEvidence('Torn did not return your player ID.')
-
-    const stats = parseBattleStats(combat)
-    if (!stats)
-      return emptyFairFightEvidence(
-        'Torn did not return readable battle stats.',
-      )
-    const attackerBss = calculateBattleStatScore(stats)
-    const attackerBalanceFactor = calculateBalanceFactor(stats)
-    const attacks = Object.entries(combat.attacks ?? {})
-    const evidence: SharedObservation[] = []
-    const observations = new Map<string, FairFightObservation[]>()
-    for (const [entryId, attack] of attacks) {
-      if (
-        attack.is_interrupted ||
-        (attack.modifiers?.group_attack ?? 1) > 1 ||
-        (attack.result &&
-          !['Hospitalized', 'Mugged', 'Attacked', 'Left'].includes(
-            attack.result,
-          ))
-      )
-        continue
-      const outgoing = attack.attacker_id === combat.player_id
-      const incoming = attack.defender_id === combat.player_id
-      if (!outgoing && !incoming) continue
-      const targetId = outgoing ? attack.defender_id : attack.attacker_id
-      const fairFight = attack.modifiers?.fair_fight
-      const timestamp =
-        (attack.timestamp_ended ?? attack.timestamp_started ?? 0) * 1000
-      // We only know the signed-in player's current stats, so do not use
-      // older fights as if those stats were known at the time.
-      if (
-        !Number.isFinite(timestamp) ||
-        timestamp < now - CURRENT_PLAYER_STATS_WINDOW ||
-        timestamp > now
-      )
-        continue
-      if (
-        !targetId ||
-        !fairFight ||
-        !Number.isFinite(fairFight) ||
-        fairFight < 1 ||
-        fairFight > 3 ||
-        attackerBss <= 0
-      )
-        continue
-      const targetObservations = observations.get(String(targetId)) ?? []
-      const observation: FairFightObservation = {
-        targetId: String(targetId),
-        attackerId: String(attack.attacker_id ?? 'self'),
-        attackerBss,
-        ...(incoming ? { defenderBss: attackerBss } : {}),
-        attackerBalanceFactor,
-        fairFight,
-        timestamp,
-        attackerStatsExact: false,
-      }
-      targetObservations.push(observation)
-      const attackId =
-        attack.id ??
-        (Array.isArray(combat.attacks)
-          ? `${attack.attacker_id}:${attack.defender_id}:${timestamp}`
-          : entryId)
-      evidence.push({
-        evidenceId: `${combat.player_id}:${attackId}`,
-        playerId: String(targetId),
-        sourcePlayerId: String(combat.player_id),
-        sourcePlayerName: combat.name?.trim() || null,
-        observation,
-      })
-      observations.set(String(targetId), targetObservations)
-    }
-    return {
-      observations,
-      evidence,
-      status: observations.size ? 'READY' : 'NO_RECENT_FIGHTS',
-    }
-  } catch (error) {
-    console.warn('[tornintel] Could not load optional Fair Fight evidence', {
-      message: error instanceof Error ? error.message : String(error),
-    })
-    return emptyFairFightEvidence(
-      error instanceof TornApiError
-        ? `Torn rejected the combat request (${error.code ?? 'HTTP'}: ${error.message}).`
-        : 'The combat request failed. Try syncing again.',
-    )
-  }
-}
-
-function emptyFairFightEvidence(reason: string): FairFightLoad {
-  return {
-    observations: new Map(),
-    evidence: [],
-    status: 'UNAVAILABLE',
-    reason,
-  }
-}
-
-function parseBattleStats(combat: TornCombatResponse): BattleStats | null {
-  const source = combat.battlestats ?? combat
-  const value = (stat: TornBattleStat | undefined) => {
-    const raw = typeof stat === 'object' ? stat.value : stat
-    if (typeof raw === 'number') return raw
-    if (typeof raw === 'string' && /^[\d,]+(?:\.\d+)?$/.test(raw))
-      return Number(raw.replaceAll(',', ''))
-    return null
-  }
-  const strength = value(source.strength)
-  const speed = value(source.speed)
-  const defense = value(source.defense)
-  const dexterity = value(source.dexterity)
-  if (
-    strength === null ||
-    speed === null ||
-    defense === null ||
-    dexterity === null ||
-    ![strength, speed, defense, dexterity].every(
-      (stat) => Number.isFinite(stat) && stat >= 0,
-    )
-  ) {
-    return null
-  }
-  return { strength, speed, defense, dexterity }
 }
 
 function stripHtml(value?: string | null) {

@@ -39,11 +39,11 @@ npm run db:migrate       # run migrations against DATABASE_URL
 - The dev server regenerates `src/routeTree.gen.ts` whenever route files change. Never `git stash` while it runs: the regenerated file blocks `git stash pop` (recover with `git checkout -- src/routeTree.gen.ts`, then pop again).
 - Do not use `npx tsr generate`: it drops the `@tanstack/react-start` registration from the route tree, breaking types in every API route. Regenerate with `npx vite build`. Never edit `routeTree.gen.ts` by hand.
 - `npm ci` and builds can rewrite `package-lock.json`. Restore it with `git checkout -- package-lock.json` unless dependencies changed on purpose.
-- Known noise that predates current work: `npx tsc --noEmit` reports 18 drizzle-orm type errors (in `src/db/`, travel, shared evidence and faction sharing, including their integration tests) and eslint reports 2 errors in `src/lib/travel/travel.integration.test.ts`. Any other errors are yours.
+- On a fresh `npm ci`, `npx tsc --noEmit` and `npm run lint` are clean: any error is yours. If tsc reports `TS7016 Could not find a declaration file for module 'drizzle-orm'` (and lint then flags assertions in the travel integration test), the local `node_modules/drizzle-orm` is missing its `.d.ts` files: stop the dev server and reinstall with `npm ci`.
 - The working copy uses CRLF (autocrlf) and the index stores LF (`.gitattributes`). `prettier.config.js` sets `endOfLine: 'auto'` so prettier keeps each file's line endings.
 - Format only the files you changed (`npx prettier --write <files>`). Never `npm run format` or `prettier --write .`: it touches the whole repo. Before finishing, check `git diff --stat` and revert line-ending-only or whitespace-only changes to unrelated files.
 - When moving types or functions between files, let the compiler find the references: move, run `npx tsc --noEmit`, fix every new error, repeat. Text-replacement scripts miss references inside function bodies.
-- CI (`.github/workflows/coolify-deploy.yml`) runs neither lint nor tests. It only builds a Docker image for ghcr.io and calls the Coolify webhook on push to `main`. Run checks locally.
+- CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main`, as separate checks: lint and `prettier --check .`, typecheck, unit tests, integration tests against a throwaway Postgres (migrations, then `TORNINTEL_DB_TEST=1`), and a build that fails when `src/routeTree.gen.ts` was not regenerated. Deploying is separate: `.github/workflows/coolify-deploy.yml` builds the Docker image and calls the Coolify webhook on push to `main`, whether or not CI passed.
 
 ## Architecture
 

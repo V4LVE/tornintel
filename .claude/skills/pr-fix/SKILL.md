@@ -98,7 +98,7 @@ npm run lint
 npx prettier --check <changed files>
 ```
 
-Known noise: the drizzle-orm tsc errors, 2 eslint errors in `src/lib/travel/travel.integration.test.ts`. Anything else must be fixed before going on. Check `git diff --stat origin/<headRefName>..HEAD` for unrelated churn (`package-lock.json`, line endings) and revert it.
+Tsc and lint are clean on a fresh install, so every error counts; `TS7016` for `drizzle-orm` means a broken local install (see AGENTS.md), not a code problem. Fix every error before going on. Check `git diff --stat origin/<headRefName>..HEAD` for unrelated churn (`package-lock.json`, line endings) and revert it.
 
 ## Step 6 - Push and reply (after a yes)
 

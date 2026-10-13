@@ -26,7 +26,7 @@ Also note, if they apply:
 
 - Background agents or tasks still running, and what each was asked to do. A fresh session cannot see them, so say what to check when they finish.
 - Whether the user's dev server is running on port 3000 (AGENTS.md: use it instead of starting another).
-- The last results of `npm test`, `npx tsc --noEmit`, `npm run lint` and the prettier check, compared with the known noise in AGENTS.md (the drizzle-orm tsc errors, 2 eslint errors in `src/lib/travel/travel.integration.test.ts`). Only report what you actually ran, and say when it was run.
+- The last results of `npm test`, `npx tsc --noEmit`, `npm run lint` and the prettier check. Tsc and lint are clean on a fresh install, so every error counts; `TS7016` for `drizzle-orm` means a broken local install (see AGENTS.md), not a code problem. Only report what you actually ran, and say when it was run.
 
 ## 2. Reference, do not copy
 
@@ -60,7 +60,7 @@ What the user wants and why, in their words where possible. The next session's f
 - Branch `<branch>` (from `<base>`), committed / uncommitted, pushed or not.
 - Done: <bullets with paths or commits>.
 - In progress: <exactly where it stopped, the next concrete step>.
-- Checks: <last results, with what is known noise>.
+- Checks: <last results, and the CI checks on the PR if there is one>.
 
 ## Decisions and why
 

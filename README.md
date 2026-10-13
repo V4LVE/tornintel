@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` and enter a Torn API key. The key is stored in browser local storage and sent to this app's API routes in the `X-Torn-Api-Key` header. The server uses it for requests to Torn. A Limited key is needed for the optional Fair Fight estimates; the other views use Torn's public or minimal selections.
+Open `http://localhost:3000` and enter a Torn API key. The key is stored in browser local storage and sent to this app's API routes in the `X-Torn-Api-Key` header. The server uses it for requests to Torn. A Limited key is needed for the optional Fair Fight estimates and for My stats; the other views use Torn's public or minimal selections.
 
 To build and start the production server:
 
@@ -23,6 +23,7 @@ npm start
 - `src/routes/index.tsx`: hospital dashboard and live chain and energy panels.
 - `src/routes/payouts.tsx`: ranked war payout calculator.
 - `src/routes/war-deals.tsx`: war deal planning and editable proposals for both outcomes. With a saved API key, faction names, current war target, item market prices, and each faction's latest completed cache rewards load automatically. Cache counts are a labeled historical baseline, not a prediction for the entered scores; all values can be adjusted manually. Compensation uses the losing faction's score, with whole items and a cash remainder. Payment wording appears only when a rate or timing is supplied. Manual planning remains available without an API key at `/war-deals`.
+- `src/routes/my-stats.tsx`: your own battle stats with modifiers, a progress chart (7D to 1Y), range gains, and a build summary. Past readings come from Torn's historical `personalstats` and are cached in this browser's local storage. Below that, players can opt in to share their real stats with their faction, and see a list of their faction with the real stats and progression of members who share, plus optional FF Scouter estimates (the same opt-in and key as on the levelling page). Shared readings are fetched by the server from Torn, stored in the database, and deleted when sharing is turned off.
 - `src/routes/levelling.tsx`: levelling targets grouped into tiers of ten levels.
 - `src/routes/settings.tsx`: API key and connected account settings.
 - `src/routes/api/`: server endpoints, grouped per feature in route-group folders such as `(levelling)/` that do not change the URL.

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LevellingRouteImport } from './routes/levelling'
+import { Route as MyStatsRouteImport } from './routes/my-stats'
 import { Route as PayoutsRouteImport } from './routes/payouts'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WarDealsRouteImport } from './routes/war-deals'
@@ -21,6 +22,10 @@ import { Route as ApilevellingLevellingEstimatesRouteImport } from './routes/api
 import { Route as ApilevellingLevellingListRouteImport } from './routes/api/(levelling)/levelling-list'
 import { Route as ApilevellingLevellingStatsRouteImport } from './routes/api/(levelling)/levelling-stats'
 import { Route as ApilevellingLevellingTargetsRouteImport } from './routes/api/(levelling)/levelling-targets'
+import { Route as ApimyStatsFactionStatsRouteImport } from './routes/api/(my-stats)/faction-stats'
+import { Route as ApimyStatsMyStatsRouteImport } from './routes/api/(my-stats)/my-stats'
+import { Route as ApimyStatsMyStatsHistoryRouteImport } from './routes/api/(my-stats)/my-stats-history'
+import { Route as ApimyStatsStatSharingRouteImport } from './routes/api/(my-stats)/stat-sharing'
 import { Route as ApipayoutsPayoutHitsRouteImport } from './routes/api/(payouts)/payout-hits'
 import { Route as ApiwarDealsWarDealDefaultsRouteImport } from './routes/api/(war-deals)/war-deal-defaults'
 import { Route as ApiwarHospitalChainTargetRouteImport } from './routes/api/(war-hospital)/chain-target'
@@ -36,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
 const LevellingRoute = LevellingRouteImport.update({
   id: '/levelling',
   path: '/levelling',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyStatsRoute = MyStatsRouteImport.update({
+  id: '/my-stats',
+  path: '/my-stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayoutsRoute = PayoutsRouteImport.update({
@@ -93,6 +103,27 @@ const ApilevellingLevellingTargetsRoute =
     path: '/api/levelling-targets',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApimyStatsFactionStatsRoute = ApimyStatsFactionStatsRouteImport.update({
+  id: '/api/(my-stats)/faction-stats',
+  path: '/api/faction-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApimyStatsMyStatsRoute = ApimyStatsMyStatsRouteImport.update({
+  id: '/api/(my-stats)/my-stats',
+  path: '/api/my-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApimyStatsMyStatsHistoryRoute =
+  ApimyStatsMyStatsHistoryRouteImport.update({
+    id: '/api/(my-stats)/my-stats-history',
+    path: '/api/my-stats-history',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApimyStatsStatSharingRoute = ApimyStatsStatSharingRouteImport.update({
+  id: '/api/(my-stats)/stat-sharing',
+  path: '/api/stat-sharing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApipayoutsPayoutHitsRoute = ApipayoutsPayoutHitsRouteImport.update({
   id: '/api/(payouts)/payout-hits',
   path: '/api/payout-hits',
@@ -131,6 +162,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/levelling': typeof LevellingRoute
+  '/my-stats': typeof MyStatsRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
@@ -141,6 +173,10 @@ export interface FileRoutesByFullPath {
   '/api/levelling-list': typeof ApilevellingLevellingListRoute
   '/api/levelling-stats': typeof ApilevellingLevellingStatsRoute
   '/api/levelling-targets': typeof ApilevellingLevellingTargetsRoute
+  '/api/faction-stats': typeof ApimyStatsFactionStatsRoute
+  '/api/my-stats': typeof ApimyStatsMyStatsRoute
+  '/api/my-stats-history': typeof ApimyStatsMyStatsHistoryRoute
+  '/api/stat-sharing': typeof ApimyStatsStatSharingRoute
   '/api/payout-hits': typeof ApipayoutsPayoutHitsRoute
   '/api/war-deal-defaults': typeof ApiwarDealsWarDealDefaultsRoute
   '/api/chain-target': typeof ApiwarHospitalChainTargetRoute
@@ -151,6 +187,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/levelling': typeof LevellingRoute
+  '/my-stats': typeof MyStatsRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
@@ -161,6 +198,10 @@ export interface FileRoutesByTo {
   '/api/levelling-list': typeof ApilevellingLevellingListRoute
   '/api/levelling-stats': typeof ApilevellingLevellingStatsRoute
   '/api/levelling-targets': typeof ApilevellingLevellingTargetsRoute
+  '/api/faction-stats': typeof ApimyStatsFactionStatsRoute
+  '/api/my-stats': typeof ApimyStatsMyStatsRoute
+  '/api/my-stats-history': typeof ApimyStatsMyStatsHistoryRoute
+  '/api/stat-sharing': typeof ApimyStatsStatSharingRoute
   '/api/payout-hits': typeof ApipayoutsPayoutHitsRoute
   '/api/war-deal-defaults': typeof ApiwarDealsWarDealDefaultsRoute
   '/api/chain-target': typeof ApiwarHospitalChainTargetRoute
@@ -172,6 +213,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/levelling': typeof LevellingRoute
+  '/my-stats': typeof MyStatsRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
@@ -182,6 +224,10 @@ export interface FileRoutesById {
   '/api/(levelling)/levelling-list': typeof ApilevellingLevellingListRoute
   '/api/(levelling)/levelling-stats': typeof ApilevellingLevellingStatsRoute
   '/api/(levelling)/levelling-targets': typeof ApilevellingLevellingTargetsRoute
+  '/api/(my-stats)/faction-stats': typeof ApimyStatsFactionStatsRoute
+  '/api/(my-stats)/my-stats': typeof ApimyStatsMyStatsRoute
+  '/api/(my-stats)/my-stats-history': typeof ApimyStatsMyStatsHistoryRoute
+  '/api/(my-stats)/stat-sharing': typeof ApimyStatsStatSharingRoute
   '/api/(payouts)/payout-hits': typeof ApipayoutsPayoutHitsRoute
   '/api/(war-deals)/war-deal-defaults': typeof ApiwarDealsWarDealDefaultsRoute
   '/api/(war-hospital)/chain-target': typeof ApiwarHospitalChainTargetRoute
@@ -194,6 +240,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/levelling'
+    | '/my-stats'
     | '/payouts'
     | '/settings'
     | '/war-deals'
@@ -204,6 +251,10 @@ export interface FileRouteTypes {
     | '/api/levelling-list'
     | '/api/levelling-stats'
     | '/api/levelling-targets'
+    | '/api/faction-stats'
+    | '/api/my-stats'
+    | '/api/my-stats-history'
+    | '/api/stat-sharing'
     | '/api/payout-hits'
     | '/api/war-deal-defaults'
     | '/api/chain-target'
@@ -214,6 +265,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/levelling'
+    | '/my-stats'
     | '/payouts'
     | '/settings'
     | '/war-deals'
@@ -224,6 +276,10 @@ export interface FileRouteTypes {
     | '/api/levelling-list'
     | '/api/levelling-stats'
     | '/api/levelling-targets'
+    | '/api/faction-stats'
+    | '/api/my-stats'
+    | '/api/my-stats-history'
+    | '/api/stat-sharing'
     | '/api/payout-hits'
     | '/api/war-deal-defaults'
     | '/api/chain-target'
@@ -234,6 +290,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/levelling'
+    | '/my-stats'
     | '/payouts'
     | '/settings'
     | '/war-deals'
@@ -244,6 +301,10 @@ export interface FileRouteTypes {
     | '/api/(levelling)/levelling-list'
     | '/api/(levelling)/levelling-stats'
     | '/api/(levelling)/levelling-targets'
+    | '/api/(my-stats)/faction-stats'
+    | '/api/(my-stats)/my-stats'
+    | '/api/(my-stats)/my-stats-history'
+    | '/api/(my-stats)/stat-sharing'
     | '/api/(payouts)/payout-hits'
     | '/api/(war-deals)/war-deal-defaults'
     | '/api/(war-hospital)/chain-target'
@@ -255,6 +316,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LevellingRoute: typeof LevellingRoute
+  MyStatsRoute: typeof MyStatsRoute
   PayoutsRoute: typeof PayoutsRoute
   SettingsRoute: typeof SettingsRoute
   WarDealsRoute: typeof WarDealsRoute
@@ -265,6 +327,10 @@ export interface RootRouteChildren {
   ApilevellingLevellingListRoute: typeof ApilevellingLevellingListRoute
   ApilevellingLevellingStatsRoute: typeof ApilevellingLevellingStatsRoute
   ApilevellingLevellingTargetsRoute: typeof ApilevellingLevellingTargetsRoute
+  ApimyStatsFactionStatsRoute: typeof ApimyStatsFactionStatsRoute
+  ApimyStatsMyStatsRoute: typeof ApimyStatsMyStatsRoute
+  ApimyStatsMyStatsHistoryRoute: typeof ApimyStatsMyStatsHistoryRoute
+  ApimyStatsStatSharingRoute: typeof ApimyStatsStatSharingRoute
   ApipayoutsPayoutHitsRoute: typeof ApipayoutsPayoutHitsRoute
   ApiwarDealsWarDealDefaultsRoute: typeof ApiwarDealsWarDealDefaultsRoute
   ApiwarHospitalChainTargetRoute: typeof ApiwarHospitalChainTargetRoute
@@ -287,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/levelling'
       fullPath: '/levelling'
       preLoaderRoute: typeof LevellingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-stats': {
+      id: '/my-stats'
+      path: '/my-stats'
+      fullPath: '/my-stats'
+      preLoaderRoute: typeof MyStatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payouts': {
@@ -359,6 +432,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApilevellingLevellingTargetsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/(my-stats)/faction-stats': {
+      id: '/api/(my-stats)/faction-stats'
+      path: '/api/faction-stats'
+      fullPath: '/api/faction-stats'
+      preLoaderRoute: typeof ApimyStatsFactionStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(my-stats)/my-stats': {
+      id: '/api/(my-stats)/my-stats'
+      path: '/api/my-stats'
+      fullPath: '/api/my-stats'
+      preLoaderRoute: typeof ApimyStatsMyStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(my-stats)/my-stats-history': {
+      id: '/api/(my-stats)/my-stats-history'
+      path: '/api/my-stats-history'
+      fullPath: '/api/my-stats-history'
+      preLoaderRoute: typeof ApimyStatsMyStatsHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(my-stats)/stat-sharing': {
+      id: '/api/(my-stats)/stat-sharing'
+      path: '/api/stat-sharing'
+      fullPath: '/api/stat-sharing'
+      preLoaderRoute: typeof ApimyStatsStatSharingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/(payouts)/payout-hits': {
       id: '/api/(payouts)/payout-hits'
       path: '/api/payout-hits'
@@ -407,6 +508,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LevellingRoute: LevellingRoute,
+  MyStatsRoute: MyStatsRoute,
   PayoutsRoute: PayoutsRoute,
   SettingsRoute: SettingsRoute,
   WarDealsRoute: WarDealsRoute,
@@ -417,6 +519,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApilevellingLevellingListRoute: ApilevellingLevellingListRoute,
   ApilevellingLevellingStatsRoute: ApilevellingLevellingStatsRoute,
   ApilevellingLevellingTargetsRoute: ApilevellingLevellingTargetsRoute,
+  ApimyStatsFactionStatsRoute: ApimyStatsFactionStatsRoute,
+  ApimyStatsMyStatsRoute: ApimyStatsMyStatsRoute,
+  ApimyStatsMyStatsHistoryRoute: ApimyStatsMyStatsHistoryRoute,
+  ApimyStatsStatSharingRoute: ApimyStatsStatSharingRoute,
   ApipayoutsPayoutHitsRoute: ApipayoutsPayoutHitsRoute,
   ApiwarDealsWarDealDefaultsRoute: ApiwarDealsWarDealDefaultsRoute,
   ApiwarHospitalChainTargetRoute: ApiwarHospitalChainTargetRoute,

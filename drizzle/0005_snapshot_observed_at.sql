@@ -1,0 +1,1 @@
+ALTER TABLE "shared_stat_snapshots" ADD COLUMN "observed_at" integer DEFAULT 0 NOT NULL;

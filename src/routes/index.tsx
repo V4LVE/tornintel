@@ -478,6 +478,9 @@ function Home() {
           <Link className="nav-item" to="/levelling">
             <span className="nav-icon">^</span> Levelling targets
           </Link>
+          <Link className="nav-item" to="/my-stats">
+            <span className="nav-icon">↑</span> My stats
+          </Link>
           <a className="nav-item" href="#intel">
             <span className="nav-icon">i</span> Intel reports
             <span className="soon">Soon</span>

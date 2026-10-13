@@ -29,6 +29,20 @@
       "when": 1791839522562,
       "tag": "0003_shiny_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791896624768,
+      "tag": "0004_stat_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791903376296,
+      "tag": "0005_snapshot_observed_at",
+      "breakpoints": true
     }
   ]
 }

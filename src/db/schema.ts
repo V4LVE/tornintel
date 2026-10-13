@@ -1,9 +1,11 @@
 import {
   boolean,
+  doublePrecision,
   integer,
   index,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   serial,
   text,
@@ -28,6 +30,37 @@ export const sharedFairFightObservations = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [index('shared_ff_player_idx').on(table.playerId)],
+)
+
+// Players who opted in to show their real battle stats to their faction.
+// The faction is re-read from Torn whenever the player's stats are recorded.
+export const statSharing = pgTable(
+  'stat_sharing',
+  {
+    playerId: text('player_id').primaryKey(),
+    playerName: text('player_name').notNull(),
+    factionId: text('faction_id').notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [index('stat_sharing_faction_idx').on(table.factionId)],
+)
+
+// Server-fetched battle stat readings for sharing players, one per UTC day.
+// `timestamp` is the end of the day; `observedAt` is when Torn observed the
+// values, so an older reading never replaces a newer one in the same day.
+export const sharedStatSnapshots = pgTable(
+  'shared_stat_snapshots',
+  {
+    playerId: text('player_id').notNull(),
+    timestamp: integer().notNull(),
+    observedAt: integer('observed_at').notNull().default(0),
+    strength: doublePrecision().notNull(),
+    defense: doublePrecision().notNull(),
+    speed: doublePrecision().notNull(),
+    dexterity: doublePrecision().notNull(),
+    total: doublePrecision().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.playerId, table.timestamp] })],
 )
 
 export const todos = pgTable('todos', {

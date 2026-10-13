@@ -204,24 +204,24 @@ function MyStats() {
                 </p>
               </div>
               <div className="my-stats-controls">
-                <div className="filter-tabs">
+                <div className="table-tabs">
                   {(['total', 'stats'] as const).map((value) => (
                     <button
                       key={value}
                       type="button"
-                      className={`filter-tab ${mode === value ? 'selected' : ''}`}
+                      className={`table-tab ${mode === value ? 'selected' : ''}`}
                       onClick={() => setMode(value)}
                     >
                       {value === 'total' ? 'Total' : 'Per stat'}
                     </button>
                   ))}
                 </div>
-                <div className="filter-tabs">
+                <div className="table-tabs">
                   {(Object.keys(RANGES) as RangeKey[]).map((value) => (
                     <button
                       key={value}
                       type="button"
-                      className={`filter-tab ${range === value ? 'selected' : ''}`}
+                      className={`table-tab ${range === value ? 'selected' : ''}`}
                       onClick={() => setRange(value)}
                     >
                       {RANGES[value].label}
@@ -499,12 +499,12 @@ function FactionStats({
             </p>
           </div>
           <div className="my-stats-controls">
-            <div className="filter-tabs">
+            <div className="table-tabs">
               {(Object.keys(RANGES) as RangeKey[]).map((value) => (
                 <button
                   key={value}
                   type="button"
-                  className={`filter-tab ${range === value ? 'selected' : ''}`}
+                  className={`table-tab ${range === value ? 'selected' : ''}`}
                   onClick={() => setRange(value)}
                 >
                   {RANGES[value].label}
@@ -685,12 +685,12 @@ function FactionMemberRow({
                   )}
                 </div>
               ))}
-              <div className="filter-tabs">
+              <div className="table-tabs">
                 {(['total', 'stats'] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
-                    className={`filter-tab ${mode === value ? 'selected' : ''}`}
+                    className={`table-tab ${mode === value ? 'selected' : ''}`}
                     onClick={() => setMode(value)}
                   >
                     {value === 'total' ? 'Total' : 'Per stat'}

@@ -1,0 +1,17 @@
+# Store text files with LF in the repository. Checkouts follow core.autocrlf
+# (CRLF on Windows), and prettier keeps whatever a file has (endOfLine: 'auto').
+* text=auto
+
+# Binary files: never convert line endings or show text diffs.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary

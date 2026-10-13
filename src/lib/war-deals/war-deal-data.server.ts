@@ -1,4 +1,4 @@
-import { fetchTorn } from './torn-api.server'
+import { fetchTorn } from '../torn/torn-api.server'
 import type { DealDefaults } from './war-deal-data'
 
 type Faction = { id: number; name: string }

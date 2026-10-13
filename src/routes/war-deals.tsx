@@ -5,9 +5,9 @@ import {
   money,
   number,
   summarizeDeal,
-} from '#/lib/war-deal'
-import type { CacheEstimate } from '#/lib/war-deal'
-import type { DealDefaults } from '#/lib/war-deal-data'
+} from '#/lib/war-deals/war-deal'
+import type { CacheEstimate } from '#/lib/war-deals/war-deal'
+import type { DealDefaults } from '#/lib/war-deals/war-deal-data'
 
 export const Route = createFileRoute('/war-deals')({
   component: WarDeals,

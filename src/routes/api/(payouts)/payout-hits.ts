@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn } from '#/lib/torn-api.server'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 
 type Player = { id: string; name: string; warHits: number; nonWarHits: number }
 type Attack = {
@@ -17,7 +17,7 @@ type RankedReport = {
   }
 }
 
-export const Route = createFileRoute('/api/payout-hits')({
+export const Route = createFileRoute('/api/(payouts)/payout-hits')({
   server: {
     handlers: {
       GET: async ({ request }) => {

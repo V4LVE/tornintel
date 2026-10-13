@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 
 type TornBar = {
   current: number
@@ -22,7 +22,7 @@ type TornBarsResponse = {
   error?: { code: number; error: string }
 }
 
-export const Route = createFileRoute('/api/combat-bars')({
+export const Route = createFileRoute('/api/(war-hospital)/combat-bars')({
   server: {
     handlers: {
       GET: async ({ request }) => {

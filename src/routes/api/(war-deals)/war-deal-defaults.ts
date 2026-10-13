@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { loadDealDefaults } from '#/lib/war-deal-data.server'
+import { loadDealDefaults } from '#/lib/war-deals/war-deal-data.server'
 
-export const Route = createFileRoute('/api/war-deal-defaults')({
+export const Route = createFileRoute('/api/(war-deals)/war-deal-defaults')({
   server: {
     handlers: {
       GET: async ({ request }) => {

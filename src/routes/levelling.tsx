@@ -31,6 +31,7 @@ function Levelling() {
   const [tier, setTier] = useState<LevellingTier>('tier1')
   const [players, setPlayers] = useState<LevellingPlayer[]>([])
   const [listWarning, setListWarning] = useState('')
+  const [canEdit, setCanEdit] = useState(false)
   const [estimates, setEstimates] = useState<Estimates>({})
   const [estimatesError, setEstimatesError] = useState('')
   // null until loaded; players without Fair Fight evidence are left out.
@@ -55,10 +56,14 @@ function Levelling() {
   const ffScouterActive = useFfScouter && Boolean(ffScouterKey || apiKey)
 
   useEffect(() => {
-    setApiKey(localStorage.getItem('tornintel.apiKey') ?? '')
+    const savedApiKey = localStorage.getItem('tornintel.apiKey') ?? ''
+    setApiKey(savedApiKey)
     setFfScouterKey(localStorage.getItem(FF_SCOUTER_KEY_STORAGE) ?? '')
     setUseFfScouter(localStorage.getItem(FF_SCOUTER_SETTING) === '1')
-    void apiRequest<LevellingListResponse>('/api/levelling-list')
+    // The key only tells the server whether this viewer may remove players.
+    void apiRequest<LevellingListResponse>('/api/levelling-list', {
+      apiKey: savedApiKey,
+    })
       .then((list) => {
         applyList(list)
         setTier(busiestTier(list.players))
@@ -114,6 +119,7 @@ function Levelling() {
 
   function applyList(list: LevellingListResponse) {
     setPlayers(list.players)
+    setCanEdit(list.canEdit === true)
     setListWarning(list.warning ?? '')
   }
 
@@ -393,7 +399,7 @@ function Levelling() {
                 tbs={tbs?.[player.id]}
                 showTbs={Boolean(apiKey)}
                 tbsLoaded={tbsLoadedFor === tierIds}
-                onRemove={apiKey ? () => void removePlayer(player) : undefined}
+                onRemove={canEdit ? () => void removePlayer(player) : undefined}
               />
             ))}
           </tbody>

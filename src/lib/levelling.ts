@@ -48,6 +48,8 @@ export type FfScouterEstimate = {
 
 export type LevellingListResponse = {
   players: LevellingPlayer[]
+  // True when the viewer's key belongs to a trusted editor who may remove players.
+  canEdit?: boolean
   warning?: string
   error?: string
 }

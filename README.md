@@ -56,7 +56,7 @@ Turning on Use FF Scouter estimates shows current [FF Scouter](https://ffscouter
 
 ### Shared list changes
 
-Players added from Find new players, and players removed from the list, are stored in the `levelling_list_changes` table and shared with all tornintel users. Run `npm run db:migrate` to create it. The editor's identity comes from their Torn API key, and an added player's name and level come from Torn. Added players keep FF Scouter's total estimate from when they were added. Removing a player hides it; adding the same player again restores it. Without a database the original lists are shown and changes are disabled.
+Players added from Find new players, and players removed from the list, are stored in the `levelling_list_changes` table and shared with all tornintel users. Run `npm run db:migrate` to create it. The editor's identity comes from their Torn API key, and an added player's name and level come from Torn. Added players keep FF Scouter's total estimate from when they were added. Anyone with an API key can add new players, but removing players, and restoring removed ones, is limited to trusted editors: set `LEVELLING_EDITOR_IDS` and/or `LEVELLING_EDITOR_FACTION_IDS` to comma-separated Torn player or faction IDs. With neither set, nobody can remove players. Remove buttons only appear for editors. Removing a player hides it; an editor adding the same player again restores it. Without a database the original lists are shown and changes are disabled.
 
 ## Tracked faction
 

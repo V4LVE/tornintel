@@ -66,6 +66,7 @@ npm run db:migrate       # run migrations against DATABASE_URL
 - **`levelling-list`**:
   - GET: the bundled list plus shared changes.
   - POST `{playerId, action: 'add'|'remove'}`: the editor's identity and the player's name/level come from Torn, never from the request body.
+  - Removing players and restoring removed ones is limited to trusted editors (`isLevellingEditor`, configured with `LEVELLING_EDITOR_IDS`/`LEVELLING_EDITOR_FACTION_IDS`); anyone with a key can add new players. GET with a key returns `canEdit` so the UI only shows Remove to editors. Any change that affects every user must check permissions, not just identity.
 - **`levelling-targets`**: random targets from a tier, checked with Torn `basic`. At most 12 checks, three at a time.
 - **`levelling-stats`**: Fair Fight based TBS estimates for a list of IDs.
 - **`levelling-estimates`**, **`levelling-discover`** and **`ffscouter-key`**: proxies to FF Scouter's `get-stats`, `get-targets` and `check-key`.
@@ -152,4 +153,4 @@ Everything must work without `DATABASE_URL`. Each storage feature checks `proces
 
 ## Environment variables (`.env`, see `.env.example`)
 
-`DATABASE_URL` (optional, but needed for shared data), `TORN_ENEMY_FACTION_ID` (optional fallback), `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` (Better Auth, required in production) and `TORNINTEL_DB_TEST` (integration tests). Never commit `.env` or real keys.
+`DATABASE_URL` (optional, but needed for shared data), `TORN_ENEMY_FACTION_ID` (optional fallback), `LEVELLING_EDITOR_IDS` and `LEVELLING_EDITOR_FACTION_IDS` (trusted levelling list editors; none means nobody can remove), `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` (Better Auth, required in production) and `TORNINTEL_DB_TEST` (integration tests). Never commit `.env` or real keys.

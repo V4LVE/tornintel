@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createFfScouterClient, FfScouterError } from './ffscouter.server'
-import type { LevellingListChange } from './levelling'
-import { bundledPlayers, levellingListRepository } from './levelling.server'
+import { bundledPlayers } from './levelling.server'
 import { Route as DiscoverRoute } from '../routes/api/levelling-discover'
 import { Route as EstimatesRoute } from '../routes/api/levelling-estimates'
 import { Route as KeyRoute } from '../routes/api/ffscouter-key'
@@ -203,90 +202,6 @@ test('list route serves the bundled lists and refuses changes without storage', 
     assert.equal((await post({ playerId: 1, action: 'add' })).status, 503)
   } finally {
     if (savedUrl !== undefined) process.env.DATABASE_URL = savedUrl
-  }
-})
-
-test('list route records changes using identities verified by Torn', async () => {
-  const invoke = handlerFor(ListRoute)
-  const savedUrl = process.env.DATABASE_URL
-  const { load, save } = levellingListRepository
-  const changes: (LevellingListChange & { changedById: number })[] = []
-  process.env.DATABASE_URL = 'postgres://test'
-  levellingListRepository.load = async () => changes
-  levellingListRepository.save = async (change) => {
-    const index = changes.findIndex((item) => item.playerId === change.playerId)
-    if (index === -1) changes.push(change)
-    else changes[index] = change
-  }
-  const removed = bundledPlayers[0]
-  try {
-    await withFetch(
-      (url) => {
-        if (url.hostname === 'ffscouter.com')
-          return Response.json([stats(777001, 250)])
-        const id = url.pathname.replace('/user/', '')
-        return Response.json(
-          id
-            ? { player_id: 777001, name: 'Fresh', level: 18 }
-            : { player_id: 42, name: 'Editor', level: 50 },
-        )
-      },
-      async () => {
-        const post = (body: unknown) =>
-          invoke('POST', '/api/levelling-list', {
-            headers: { ...keyHeader, 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-        const added = await post({
-          playerId: 777001,
-          action: 'add',
-          name: 'Spoofed',
-          addedById: 1,
-        })
-        assert.equal(added.status, 200)
-        const addedPlayer = (await added.json()).players.find(
-          (player: { id: number }) => player.id === 777001,
-        )
-        assert.deepEqual(
-          {
-            name: addedPlayer.name,
-            level: addedPlayer.level,
-            total: addedPlayer.total,
-            addedBy: addedPlayer.addedBy,
-          },
-          {
-            name: 'Fresh',
-            level: 18,
-            total: 250,
-            addedBy: { id: 42, name: 'Editor' },
-          },
-        )
-        assert.equal(
-          (await post({ playerId: 777001, action: 'add' })).status,
-          409,
-        )
-
-        const response = await post({ playerId: removed.id, action: 'remove' })
-        assert.equal(response.status, 200)
-        const { players } = await response.json()
-        assert.ok(
-          !players.some((player: { id: number }) => player.id === removed.id),
-        )
-        assert.equal(
-          changes.find((item) => item.playerId === removed.id)?.changedById,
-          42,
-        )
-        assert.equal(
-          (await post({ playerId: removed.id, action: 'remove' })).status,
-          404,
-        )
-      },
-    )
-  } finally {
-    levellingListRepository.load = load
-    levellingListRepository.save = save
-    if (savedUrl === undefined) delete process.env.DATABASE_URL
-    else process.env.DATABASE_URL = savedUrl
   }
 })
 

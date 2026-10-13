@@ -3,6 +3,7 @@ import { ffScouter, ffScouterKeyFrom } from '#/lib/ffscouter.server'
 import { LEVELLING_TIERS } from '#/lib/levelling'
 import type { LevellingListResponse } from '#/lib/levelling'
 import {
+  isLevellingEditor,
   levellingListRepository,
   loadLevellingPlayers,
 } from '#/lib/levelling.server'
@@ -13,6 +14,8 @@ type BasicProfile = {
   name?: string
   level?: number
 }
+
+type EditorProfile = BasicProfile & { faction?: { faction_id?: number } }
 
 const headers = { 'Cache-Control': 'no-store' }
 const MIN_LEVEL = Math.min(
@@ -25,10 +28,20 @@ const MAX_LEVEL = Math.max(
 export const Route = createFileRoute('/api/levelling-list')({
   server: {
     handlers: {
-      GET: async () => {
-        const { players, warning } = await loadLevellingPlayers()
+      GET: async ({ request }) => {
+        const apiKey = request.headers.get('x-torn-api-key')?.trim()
+        const [{ players, warning }, canEdit] = await Promise.all([
+          loadLevellingPlayers(),
+          // The list is public; a key only reveals whether the viewer may edit.
+          apiKey
+            ? loadEditor(apiKey).then(
+                (editor) => editor.canEdit,
+                () => false,
+              )
+            : false,
+        ])
         return Response.json(
-          { players, warning } satisfies LevellingListResponse,
+          { players, canEdit, warning } satisfies LevellingListResponse,
           { headers },
         )
       },
@@ -65,14 +78,20 @@ export const Route = createFileRoute('/api/levelling-list')({
 
         try {
           // Record who made the change from Torn, never from the request body.
-          const editor = await loadBasic(apiKey)
-          if (!editor.player_id || !editor.name) {
-            throw new Error('Torn returned an incomplete profile.')
-          }
-          const { players } = await loadLevellingPlayers()
+          const editor = await loadEditor(apiKey)
+          const { players, removedIds } = await loadLevellingPlayers()
           const current = players.find((player) => player.id === playerId)
 
           if (action === 'remove') {
+            if (!editor.canEdit) {
+              return Response.json(
+                {
+                  error:
+                    'Only trusted editors can remove players from the shared list.',
+                },
+                { status: 403, headers },
+              )
+            }
             if (!current) {
               return Response.json(
                 { error: 'That player is not on the list.' },
@@ -87,13 +106,23 @@ export const Route = createFileRoute('/api/levelling-list')({
               removed: true,
               addedById: current.addedBy?.id ?? null,
               addedByName: current.addedBy?.name ?? null,
-              changedById: editor.player_id,
+              changedById: editor.id,
             })
           } else {
             if (current) {
               return Response.json(
                 { error: 'That player is already on the list.' },
                 { status: 409, headers },
+              )
+            }
+            // Otherwise anyone could undo an editor's removal by adding it back.
+            if (removedIds.has(playerId) && !editor.canEdit) {
+              return Response.json(
+                {
+                  error:
+                    'A trusted editor removed this player. Only editors can restore them.',
+                },
+                { status: 403, headers },
               )
             }
             const target = await loadBasic(apiKey, playerId)
@@ -125,9 +154,9 @@ export const Route = createFileRoute('/api/levelling-list')({
               level: target.level,
               totalEstimate: estimates?.get(playerId)?.total ?? null,
               removed: false,
-              addedById: editor.player_id,
+              addedById: editor.id,
               addedByName: editor.name,
-              changedById: editor.player_id,
+              changedById: editor.id,
             })
           }
 
@@ -135,6 +164,7 @@ export const Route = createFileRoute('/api/levelling-list')({
           return Response.json(
             {
               players: updated.players,
+              canEdit: editor.canEdit,
               warning: updated.warning,
             } satisfies LevellingListResponse,
             { headers },
@@ -161,8 +191,24 @@ export const Route = createFileRoute('/api/levelling-list')({
   },
 })
 
-async function loadBasic(apiKey: string, id?: number) {
-  const url = new URL(`https://api.torn.com/user/${id ?? ''}`)
+async function loadEditor(apiKey: string) {
+  const url = new URL('https://api.torn.com/user/')
+  url.searchParams.set('selections', 'profile')
+  url.searchParams.set('key', apiKey)
+  const { data } = await fetchTorn<EditorProfile>(url, { maxAgeMs: 60000 })
+  if (!data.player_id || !data.name) {
+    throw new Error('Torn returned an incomplete profile.')
+  }
+  const editor = {
+    id: data.player_id,
+    name: data.name,
+    factionId: data.faction?.faction_id || null,
+  }
+  return { ...editor, canEdit: isLevellingEditor(editor) }
+}
+
+async function loadBasic(apiKey: string, id: number) {
+  const url = new URL(`https://api.torn.com/user/${id}`)
   url.searchParams.set('selections', 'basic')
   url.searchParams.set('key', apiKey)
   try {
@@ -170,7 +216,7 @@ async function loadBasic(apiKey: string, id?: number) {
     return data
   } catch (error) {
     // Torn reports an unknown player ID as code 6; treat it as not found.
-    if (id && error instanceof TornApiError && error.code === 6) return {}
+    if (error instanceof TornApiError && error.code === 6) return {}
     throw error
   }
 }

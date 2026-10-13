@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn } from '#/lib/torn-api.server'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 import {
   HISTORIC_STAT_QUERY,
   parsePersonalStats,
@@ -14,7 +14,7 @@ type TornPersonalStatsResponse = {
 // Past readings never change, so they can be reused for a day.
 const HISTORY_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
-export const Route = createFileRoute('/api/my-stats-history')({
+export const Route = createFileRoute('/api/(my-stats)/my-stats-history')({
   server: {
     handlers: {
       GET: async ({ request }) => {

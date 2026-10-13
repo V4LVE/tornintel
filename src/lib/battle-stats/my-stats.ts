@@ -1,6 +1,8 @@
 // The key owner's own battle stats: shared types and pure helpers used by the
 // /api/my-stats routes and the My stats page.
 
+import type { FfScouterEstimate } from '#/lib/levelling/levelling'
+
 export const STAT_NAMES = ['strength', 'defense', 'speed', 'dexterity'] as const
 export type StatName = (typeof STAT_NAMES)[number]
 
@@ -180,14 +182,6 @@ export function sampleTimestamps(
     result.push(today - offset * DAY + DAY - 1)
   }
   return result
-}
-
-export type FfScouterEstimate = {
-  total: number | null
-  human: string | null
-  fairFight: number | null
-  /** Unix seconds. */
-  updatedAt: number | null
 }
 
 export type FactionStatsMember = {

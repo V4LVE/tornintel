@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { sharedStatSnapshots, statSharing } from '#/db/schema'
-import { fetchTorn } from '#/lib/torn-api.server'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 import { dayEnd } from './my-stats'
 import type { StatPoint } from './my-stats'
 

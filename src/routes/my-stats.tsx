@@ -19,8 +19,9 @@ import type {
   StatName,
   StatPoint,
 } from '#/lib/battle-stats/my-stats'
-import { clearStatHistory, useStatHistory } from '#/lib/use-stat-history'
-import { useVisiblePolling } from '#/lib/use-visible-polling'
+import { clearStatHistory, useStatHistory } from '#/lib/hooks/use-stat-history'
+import { useVisiblePolling } from '#/lib/hooks/use-visible-polling'
+import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter/ffscouter'
 
 export const Route = createFileRoute('/my-stats')({ component: MyStats })
 
@@ -301,13 +302,22 @@ function MyStats() {
   )
 }
 
-async function requestJson<T>(url: string, apiKey: string, init?: RequestInit) {
+// Shared with the levelling page: whether the viewer opted in to FF Scouter.
+const FF_SCOUTER_SETTING = 'tornintel.ffscouter'
+
+async function requestJson<T>(
+  url: string,
+  apiKey: string,
+  init?: RequestInit & { ffScouterKey?: string },
+) {
+  const { ffScouterKey, ...options } = init ?? {}
   const response = await fetch(url, {
-    ...init,
+    ...options,
     cache: 'no-store',
     headers: {
       'X-Torn-Api-Key': apiKey,
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(ffScouterKey ? { 'X-FfScouter-Key': ffScouterKey } : {}),
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     },
   })
   const payload = (await response.json()) as T & { error?: string }
@@ -335,37 +345,67 @@ function FactionStats({
   const [isSaving, setIsSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [range, setRange] = useState<RangeKey>('30d')
-
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      setData(
-        await requestJson<FactionStatsResponse>('/api/faction-stats', apiKey),
-      )
-      setError('')
-    } catch (requestError) {
-      setError(errorMessage(requestError, 'Unable to load your faction.'))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [apiKey])
+  const [ffScouterKey, setFfScouterKey] = useState('')
+  const [useFfScouter, setUseFfScouter] = useState<boolean | null>(null)
 
   useEffect(() => {
-    void load()
+    setFfScouterKey(localStorage.getItem(FF_SCOUTER_KEY_STORAGE) ?? '')
+    setUseFfScouter(localStorage.getItem(FF_SCOUTER_SETTING) === '1')
+  }, [])
+
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      if (useFfScouter === null) return
+      setIsLoading(true)
+      try {
+        const payload = await requestJson<FactionStatsResponse>(
+          `/api/faction-stats${useFfScouter ? '?ffscouter=1' : ''}`,
+          apiKey,
+          { ffScouterKey, signal },
+        )
+        if (signal?.aborted) return
+        setData(payload)
+        setError('')
+      } catch (requestError) {
+        if (signal?.aborted) return
+        setError(errorMessage(requestError, 'Unable to load your faction.'))
+      } finally {
+        if (!signal?.aborted) setIsLoading(false)
+      }
+    },
+    [apiKey, ffScouterKey, useFfScouter],
+  )
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
+  }, [load])
+
+  useEffect(() => {
+    const controller = new AbortController()
     requestJson<{ isSharing: boolean; factionName: string | null }>(
       '/api/stat-sharing',
       apiKey,
+      { signal: controller.signal },
     )
       .then((sharing) => {
         setIsSharing(sharing.isSharing)
         setFactionName(sharing.factionName)
       })
-      .catch((requestError: unknown) =>
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return
         setSharingError(
           errorMessage(requestError, 'Unable to load your sharing setting.'),
-        ),
-      )
-  }, [apiKey, load])
+        )
+      })
+    return () => controller.abort()
+  }, [apiKey])
+
+  function toggleFfScouter(enabled: boolean) {
+    setUseFfScouter(enabled)
+    localStorage.setItem(FF_SCOUTER_SETTING, enabled ? '1' : '0')
+  }
 
   async function updateSharing(enabled: boolean) {
     if (
@@ -432,8 +472,29 @@ function FactionStats({
             <h2>{data ? data.faction.name : 'Your faction'}</h2>
             <p>
               {data
-                ? `${data.members.length} members · ${sharedCount} sharing real stats · estimates from FF Scouter`
-                : 'Estimates from FF Scouter, plus real stats from members who share.'}
+                ? `${data.members.length} members · ${sharedCount} sharing real stats`
+                : 'Real stats from members who share, plus optional FF Scouter estimates.'}
+            </p>
+            <label className="my-stats-ffscouter">
+              <input
+                type="checkbox"
+                checked={Boolean(useFfScouter)}
+                onChange={(event) => toggleFfScouter(event.target.checked)}
+              />{' '}
+              Use FF Scouter estimates
+            </label>
+            <p>
+              {ffScouterKey
+                ? 'Your FF Scouter key from Settings'
+                : 'Your Torn API key'}{' '}
+              is sent to{' '}
+              <a href="https://ffscouter.com" target="_blank" rel="noreferrer">
+                ffscouter.com
+              </a>{' '}
+              and must be registered there.{' '}
+              <a href="/settings">
+                {ffScouterKey ? 'Change' : 'Use a separate'} FF Scouter key
+              </a>
             </p>
           </div>
           <div className="my-stats-controls">
@@ -473,7 +534,7 @@ function FactionStats({
                 <tr>
                   <th>MEMBER</th>
                   <th>LEVEL</th>
-                  <th>FF SCOUTER EST.</th>
+                  {useFfScouter && <th>FF SCOUTER EST.</th>}
                   <th>REAL TOTAL</th>
                   <th>GAIN {RANGES[range].label}</th>
                   <th>
@@ -494,6 +555,7 @@ function FactionStats({
                       )
                     }
                     since={since}
+                    showEstimate={Boolean(useFfScouter)}
                   />
                 ))}
               </tbody>
@@ -515,12 +577,14 @@ function FactionMemberRow({
   isExpanded,
   onToggle,
   since,
+  showEstimate,
 }: {
   member: FactionStatsMember
   isViewer: boolean
   isExpanded: boolean
   onToggle: () => void
   since: number
+  showEstimate: boolean
 }) {
   const { estimate, shared } = member
   const [mode, setMode] = useState<'total' | 'stats'>('total')
@@ -545,17 +609,17 @@ function FactionMemberRow({
           {isViewer && <span className="faction-stats-you">You</span>}
         </td>
         <td>{member.level}</td>
-        <td
-          title={
-            estimate?.updatedAt
-              ? `Fair fight ${estimate.fairFight ?? '?'} · updated ${new Date(estimate.updatedAt * 1000).toLocaleDateString()}`
-              : undefined
-          }
-        >
-          {estimate?.total
-            ? (estimate.human ?? formatCompactStat(estimate.total))
-            : '—'}
-        </td>
+        {showEstimate && (
+          <td
+            title={
+              estimate?.updatedAt
+                ? `Fair fight ${estimate.fairFight ?? '?'} · updated ${new Date(estimate.updatedAt).toLocaleDateString()}`
+                : undefined
+            }
+          >
+            {estimate ? estimate.human : '—'}
+          </td>
+        )}
         <td>
           {shared ? (
             <strong title={shared.current.total.toLocaleString()}>
@@ -589,7 +653,7 @@ function FactionMemberRow({
       </tr>
       {isExpanded && shared && (
         <tr className="faction-stats-detail">
-          <td colSpan={6}>
+          <td colSpan={showEstimate ? 6 : 5}>
             <div className="faction-stats-breakdown">
               {STAT_NAMES.map((stat) => (
                 <div key={stat}>

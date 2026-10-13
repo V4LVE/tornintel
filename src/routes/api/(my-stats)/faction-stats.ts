@@ -1,12 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn } from '#/lib/torn-api.server'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 import {
   fetchPlayerIdentity,
   sharedHistorySince,
   statSharingRepository,
 } from '#/lib/battle-stats/faction-sharing.server'
-import { fetchFfScouterEstimates } from '#/lib/battle-stats/ff-scouter.server'
+import {
+  FfScouterError,
+  ffScouter,
+  ffScouterKeyFrom,
+} from '#/lib/ffscouter/ffscouter.server'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
+import type { FfScouterEstimate } from '#/lib/levelling/levelling'
 import type {
   FactionStatsMember,
   FactionStatsResponse,
@@ -18,7 +23,7 @@ type TornFactionResponse = {
   members?: Record<string, { name: string; level: number }>
 }
 
-export const Route = createFileRoute('/api/faction-stats')({
+export const Route = createFileRoute('/api/(my-stats)/faction-stats')({
   server: {
     handlers: {
       GET: async ({ request }) => {
@@ -52,8 +57,13 @@ export const Route = createFileRoute('/api/faction-stats')({
           const entries = Object.entries(faction.members ?? {})
           const memberIds = entries.map(([id]) => id)
 
-          const [ffScouter, sharing] = await Promise.all([
-            fetchFfScouterEstimates(apiKey, memberIds),
+          // FF Scouter is opt-in because it sends a key to a third party.
+          const useFfScouter =
+            new URL(request.url).searchParams.get('ffscouter') === '1'
+          const [estimates, sharing] = await Promise.all([
+            useFfScouter
+              ? loadEstimates(ffScouterKeyFrom(request), memberIds)
+              : NO_ESTIMATES,
             loadSharing(viewer.factionId, memberIds),
           ])
 
@@ -62,7 +72,7 @@ export const Route = createFileRoute('/api/faction-stats')({
               id,
               name: member.name,
               level: member.level,
-              estimate: ffScouter.estimates.get(id) ?? null,
+              estimate: estimates.estimates.get(Number(id)) ?? null,
               shared: sharing.shared.get(id) ?? null,
             }))
             .sort(
@@ -78,7 +88,7 @@ export const Route = createFileRoute('/api/faction-stats')({
             },
             viewer: { id: viewer.id, isSharing: sharing.shared.has(viewer.id) },
             members,
-            ffScouterReason: ffScouter.reason,
+            ffScouterReason: estimates.reason,
             sharingReason: sharing.reason,
           }
           return Response.json(response, {
@@ -94,6 +104,35 @@ export const Route = createFileRoute('/api/faction-stats')({
     },
   },
 })
+
+type EstimatesResult = {
+  estimates: Map<number, FfScouterEstimate | null>
+  reason?: string
+}
+
+const NO_ESTIMATES: EstimatesResult = { estimates: new Map() }
+
+async function loadEstimates(
+  key: string,
+  memberIds: string[],
+): Promise<EstimatesResult> {
+  try {
+    return {
+      estimates: await ffScouter.getEstimates(key, memberIds.map(Number)),
+    }
+  } catch (error) {
+    console.warn('[tornintel] FF Scouter estimates failed', {
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return {
+      estimates: new Map(),
+      reason:
+        error instanceof FfScouterError
+          ? error.message
+          : 'FF Scouter could not be reached. Try again shortly.',
+    }
+  }
+}
 
 function memberTotal(member: FactionStatsMember) {
   return member.shared?.current.total ?? member.estimate?.total ?? 0

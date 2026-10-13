@@ -3,11 +3,22 @@ import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
 import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
-import type { TravelEstimate } from '#/lib/travel'
-import { verifyTornUser } from '#/lib/torn-user'
-import type { UserProfile } from '#/lib/torn-user'
-import type { ChainTargetResponse } from '#/lib/chain-target'
-import { useVisiblePolling } from '#/lib/use-visible-polling'
+import type { EnemyFactionSource } from '#/lib/war-hospital/enemy-faction.server'
+import type { TravelEstimate } from '#/lib/travel/travel'
+import { verifyTornUser } from '#/lib/torn/torn-user'
+import type { UserProfile } from '#/lib/torn/torn-user'
+import type { ChainTargetResponse } from '#/lib/war-hospital/chain-target'
+import { useVisiblePolling } from '#/lib/hooks/use-visible-polling'
+import { BattleStatsCell } from '#/components/battle-stats-cell'
+import { ThemeToggle } from '#/components/theme-toggle'
+
+const MANUAL_FACTION_KEY = 'tornintel.manualFactionId'
+const FACTION_SOURCE_LABELS: Record<EnemyFactionSource, string> = {
+  manual: 'Manual',
+  'current-war': 'Auto · current ranked war',
+  'last-war': 'Auto · last ranked war',
+  default: 'Auto · server default',
+}
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -28,7 +39,7 @@ type Target = {
 }
 
 type FactionMembersResponse = {
-  faction: { id: number; name: string; tag: string }
+  faction: { id: number; name: string; tag: string; source: EnemyFactionSource }
   members: Target[]
   fairFightStatus: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
   fairFightReason?: string
@@ -82,7 +93,11 @@ function Home() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [clock, setClock] = useState(0)
+  // Empty means automatic: the server picks the opponent from your ranked wars.
   const [factionId, setFactionId] = useState('')
+  const [factionSource, setFactionSource] = useState<EnemyFactionSource | null>(
+    null,
+  )
   const [factionInput, setFactionInput] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [isPaused, setIsPaused] = useState(false)
@@ -255,12 +270,8 @@ function Home() {
         setSharedTbsReason(payload.sharedTbsReason ?? '')
         setTravelTrackingReason(payload.travelTrackingReason ?? '')
         setFactionName(payload.faction.name)
-        setFactionId(String(payload.faction.id))
+        setFactionSource(payload.faction.source)
         setFactionInput(String(payload.faction.id))
-        window.localStorage.setItem(
-          'tornintel.trackedFactionId',
-          String(payload.faction.id),
-        )
         setSynced('Just now')
         setClock(Date.now())
       } catch (requestError) {
@@ -285,13 +296,11 @@ function Home() {
   )
 
   useEffect(() => {
-    const savedFactionId = window.localStorage.getItem(
-      'tornintel.trackedFactionId',
-    )
+    // The old key stored every synced faction; only manual choices are kept now.
+    window.localStorage.removeItem('tornintel.trackedFactionId')
+    const savedFactionId = window.localStorage.getItem(MANUAL_FACTION_KEY)
     const initialFactionId =
-      savedFactionId && /^\d{1,10}$/.test(savedFactionId)
-        ? savedFactionId
-        : '56833'
+      savedFactionId && /^\d{1,10}$/.test(savedFactionId) ? savedFactionId : ''
     setFactionId(initialFactionId)
     setFactionInput(initialFactionId)
     const savedApiKey = window.localStorage.getItem('tornintel.apiKey') ?? ''
@@ -347,7 +356,7 @@ function Home() {
     event.preventDefault()
     const nextFactionId = factionInput.trim()
 
-    if (!/^\d{1,10}$/.test(nextFactionId)) {
+    if (nextFactionId && !/^\d{1,10}$/.test(nextFactionId)) {
       const message = 'Enter a numeric Torn faction ID.'
       console.warn('[tornintel] Invalid faction ID entered', {
         factionId: factionInput,
@@ -357,11 +366,21 @@ function Home() {
     }
 
     const factionChanged = nextFactionId !== factionId
+    if (nextFactionId)
+      window.localStorage.setItem(MANUAL_FACTION_KEY, nextFactionId)
+    else window.localStorage.removeItem(MANUAL_FACTION_KEY)
     setFactionId(nextFactionId)
     setError('')
     if (!isPaused && !factionChanged) {
       void refreshTargets(nextFactionId)
     }
+  }
+
+  function trackAutomatically() {
+    window.localStorage.removeItem(MANUAL_FACTION_KEY)
+    setFactionId('')
+    setFactionInput('')
+    setError('')
   }
 
   function togglePause() {
@@ -456,6 +475,9 @@ function Home() {
           <Link className="nav-item" to="/war-deals">
             <span className="nav-icon">↔</span> War deals
           </Link>
+          <Link className="nav-item" to="/levelling">
+            <span className="nav-icon">^</span> Levelling targets
+          </Link>
           <Link className="nav-item" to="/my-stats">
             <span className="nav-icon">↑</span> My stats
           </Link>
@@ -493,6 +515,7 @@ function Home() {
             <span className="connection">
               <i /> {error ? 'Torn API unavailable' : 'Torn API connected'}
             </span>
+            <ThemeToggle />
             <button className="icon-button" aria-label="Notifications">
               &#9678;
             </button>
@@ -518,11 +541,27 @@ function Home() {
                 inputMode="numeric"
                 value={factionInput}
                 onChange={(event) => setFactionInput(event.target.value)}
-                placeholder="Faction ID"
+                placeholder="Auto"
               />
               <button type="submit" disabled={isLoading}>
                 Track
               </button>
+              {factionId ? (
+                <button
+                  type="button"
+                  className="faction-auto"
+                  onClick={trackAutomatically}
+                  title="Track the opponent from your faction's ranked wars"
+                >
+                  Auto
+                </button>
+              ) : (
+                factionSource && (
+                  <span className="faction-source">
+                    {FACTION_SOURCE_LABELS[factionSource]}
+                  </span>
+                )
+              )}
             </form>
           </div>
           <div className="sync-block">
@@ -1105,91 +1144,6 @@ function formatArrivalTime(timestamp: number) {
     hour12: false,
     timeZoneName: 'short',
   })
-}
-
-function BattleStatsCell({
-  estimate,
-  contributors = [],
-}: {
-  estimate: BattleStatsEstimate
-  contributors?: BattleStatContributor[]
-}) {
-  const contributorNames = contributors
-    .map((contributor) => contributor.name || contributor.id)
-    .join(', ')
-  const evidenceDetails =
-    estimate.newestEvidenceAt === null ? null : (
-      <span title={`Contributed by: ${contributorNames}`}>
-        Recorded · {new Date(estimate.newestEvidenceAt).toLocaleDateString()}
-        {contributors.length > 0 && ` · by ${contributorNames}`}
-      </span>
-    )
-  if (estimate.estimate === null) {
-    const cappedBound = estimate.sources.includes('FAIR_FIGHT')
-      ? estimate.lowerBound !== null && estimate.lowerBound > 0
-        ? `${formatBattleStats(estimate.lowerBound)}+`
-        : estimate.upperBound !== null
-          ? `≤${formatBattleStats(estimate.upperBound)}`
-          : null
-      : null
-    return (
-      <div className="battle-stats" title={estimate.explanation}>
-        <strong>{cappedBound ?? 'No usable FF'}</strong>
-        <span className="battle-stats-method">
-          {cappedBound ? 'Capped FF · bound only' : 'No recent FF evidence'}
-        </span>
-        {evidenceDetails}
-      </div>
-    )
-  }
-
-  const range =
-    estimate.upperBound !== null && estimate.lowerBound === estimate.upperBound
-      ? formatBattleStats(estimate.estimate)
-      : estimate.upperBound === null &&
-          estimate.estimate === estimate.lowerBound
-        ? `${formatBattleStats(estimate.lowerBound)}+`
-        : `~${formatBattleStats(estimate.estimate)}`
-  const bounds = estimate.sources.includes('FALLBACK')
-    ? null
-    : estimate.upperBound === null && estimate.estimate === estimate.lowerBound
-      ? null
-      : estimate.upperBound === null
-        ? `${formatBattleStats(estimate.lowerBound ?? 0)}+`
-        : estimate.lowerBound === estimate.upperBound
-          ? null
-          : `${formatBattleStats(estimate.lowerBound ?? 0)}–${formatBattleStats(estimate.upperBound)}`
-  const method = estimate.sources.includes('EXACT')
-    ? 'Exact stats'
-    : estimate.sources.includes('SPY') &&
-        !estimate.sources.includes('FAIR_FIGHT')
-      ? 'Spy estimate'
-      : estimate.sources.includes('FAIR_FIGHT')
-        ? estimate.diagnostics.observationsAccepted > 0
-          ? `FF-based · ${estimate.diagnostics.observationsAccepted} hit${estimate.diagnostics.observationsAccepted === 1 ? '' : 's'}`
-          : 'Capped FF bound'
-        : estimate.sources.includes('FALLBACK')
-          ? 'Profile estimate · FF not used'
-          : 'Rank estimate'
-  return (
-    <div className="battle-stats" title={estimate.explanation}>
-      <strong>{range}</strong>
-      <span className="battle-stats-method">{method}</span>
-      {evidenceDetails}
-      <span>
-        {bounds ? `${bounds} · ` : ''}
-        {estimate.bss === null ? '' : `BSS ${Math.round(estimate.bss)} · `}
-        {estimate.confidenceLevel.replace('_', ' ')}
-      </span>
-    </div>
-  )
-}
-
-function formatBattleStats(value: number) {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}b`
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
-  return Math.round(value).toLocaleString()
 }
 
 function formatRelease(releaseAt: number, now: number) {

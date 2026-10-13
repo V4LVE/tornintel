@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { TestContext } from 'node:test'
-import { Route } from '../routes/api/war-deal-defaults'
+import { Route } from '../../routes/api/(war-deals)/war-deal-defaults'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function' || !handlers.GET)

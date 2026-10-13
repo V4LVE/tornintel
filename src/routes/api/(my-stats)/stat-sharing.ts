@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn } from '#/lib/torn-api.server'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 import {
   fetchPlayerIdentity,
   recordSharedStats,
@@ -30,7 +30,7 @@ function requireSetup(request: Request) {
   return { apiKey }
 }
 
-export const Route = createFileRoute('/api/stat-sharing')({
+export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
   server: {
     handlers: {
       GET: async ({ request }) => {

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn } from '#/lib/torn-api.server'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
 import { recordSharedStats } from '#/lib/battle-stats/faction-sharing.server'
 import { toStatPoint } from '#/lib/battle-stats/my-stats'
@@ -11,7 +11,7 @@ type TornMyStatsResponse = {
   error?: { code: number; error: string }
 }
 
-export const Route = createFileRoute('/api/my-stats')({
+export const Route = createFileRoute('/api/(my-stats)/my-stats')({
   server: {
     handlers: {
       GET: async ({ request }) => {

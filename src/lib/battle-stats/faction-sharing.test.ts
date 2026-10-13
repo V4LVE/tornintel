@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { TestContext } from 'node:test'
-import { Route as FactionStatsRoute } from '../../routes/api/faction-stats'
-import { Route as StatSharingRoute } from '../../routes/api/stat-sharing'
+import { Route as FactionStatsRoute } from '../../routes/api/(my-stats)/faction-stats'
+import { Route as StatSharingRoute } from '../../routes/api/(my-stats)/stat-sharing'
 import {
   recordSharedStats,
   statSharingRepository,
@@ -29,12 +29,13 @@ async function invoke(
   route: typeof FactionStatsRoute | typeof StatSharingRoute,
   method: 'GET' | 'POST',
   body?: unknown,
+  query = '',
 ) {
   const response = await getHandler(
     route,
     method,
   )({
-    request: new Request('http://localhost/api/test', {
+    request: new Request(`http://localhost/api/test${query}`, {
       method,
       headers: { 'x-torn-api-key': freshKey() },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -138,7 +139,12 @@ test('lists faction members with FF Scouter estimates and shared stats for the v
       }),
     )
 
-    const response = await invoke(FactionStatsRoute, 'GET')
+    const response = await invoke(
+      FactionStatsRoute,
+      'GET',
+      undefined,
+      '?ffscouter=1',
+    )
     assert.equal(response.status, 200)
     const payload = (await response.json()) as FactionStatsResponse
 
@@ -153,7 +159,7 @@ test('lists faction members with FF Scouter estimates and shared stats for the v
     assert.ok(alice && bob)
     assert.equal(alice.estimate?.human, '5m')
     assert.equal(alice.shared, null)
-    assert.equal(bob.estimate?.total, null)
+    assert.equal(bob.estimate, null)
     assert.equal(bob.shared?.current.total, 800)
     assert.equal(bob.shared.history.length, 2)
     assert.equal(payload.members[0].id, '1', 'sorted by best known total')
@@ -170,10 +176,23 @@ test('still lists members when FF Scouter rejects the key', async (context) => {
       snapshots: [],
     }))
     const payload = (await (
-      await invoke(FactionStatsRoute, 'GET')
+      await invoke(FactionStatsRoute, 'GET', undefined, '?ffscouter=1')
     ).json()) as FactionStatsResponse
     assert.equal(payload.members.length, 2)
     assert.match(payload.ffScouterReason ?? '', /ffscouter\.com/)
+  })
+})
+
+test('does not contact FF Scouter unless the viewer opted in', async (context) => {
+  await withDatabase(async () => {
+    const requested = mockUpstream(context)
+    context.mock.method(statSharingRepository, 'loadFaction', async () => ({
+      sharers: [],
+      snapshots: [],
+    }))
+    const response = await invoke(FactionStatsRoute, 'GET')
+    assert.equal(response.status, 200)
+    assert.ok(requested.every((host) => !host.startsWith('ffscouter.com')))
   })
 })
 

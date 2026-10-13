@@ -1,4 +1,4 @@
-import { TornApiError } from '#/lib/torn-api.server'
+import { TornApiError } from '#/lib/torn/torn-api.server'
 
 export function myStatsErrorResponse(error: unknown) {
   if (error instanceof TornApiError && error.code === 16) {

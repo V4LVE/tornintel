@@ -309,7 +309,14 @@ button {
   min-height: 100vh;
   background: var(--c-0d151d);
 }
+/* Pinned to the viewport so Settings and the profile stay at the bottom of the
+   screen instead of following the page content. */
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
   width: 238px;
   flex-shrink: 0;
   padding: 27px 14px 18px;
@@ -1682,8 +1689,10 @@ td {
     display: block;
   }
   .sidebar {
+    position: static;
     width: 100%;
     height: auto;
+    overflow-y: visible;
     padding: 15px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--c-25313b);

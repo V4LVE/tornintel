@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { LevellingListChange } from './levelling'
 import { bundledPlayers, levellingListRepository } from './levelling.server'
-import { Route } from '../routes/api/levelling-list'
+import { Route } from '../../routes/api/(levelling)/levelling-list'
 
 const handlers = Route.options.server?.handlers as
   | Partial<Record<'GET' | 'POST', (context: never) => Promise<Response>>>

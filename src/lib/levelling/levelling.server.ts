@@ -1,6 +1,6 @@
 import { db } from '#/db'
 import { levellingListChanges } from '#/db/schema'
-import players from './levelling/players.json'
+import players from './players.json'
 import { applyListChanges, normalizePlayers } from './levelling'
 import type { LevellingListChange } from './levelling'
 

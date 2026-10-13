@@ -3,14 +3,14 @@ import {
   ffScouter,
   ffScouterErrorResponse,
   ffScouterKeyFrom,
-} from '#/lib/ffscouter.server'
-import { isLevellingTier, LEVELLING_TIERS } from '#/lib/levelling'
-import type { LevellingDiscoverResponse } from '#/lib/levelling'
-import { loadLevellingPlayers } from '#/lib/levelling.server'
+} from '#/lib/ffscouter/ffscouter.server'
+import { isLevellingTier, LEVELLING_TIERS } from '#/lib/levelling/levelling'
+import type { LevellingDiscoverResponse } from '#/lib/levelling/levelling'
+import { loadLevellingPlayers } from '#/lib/levelling/levelling.server'
 
 const headers = { 'Cache-Control': 'no-store' }
 
-export const Route = createFileRoute('/api/levelling-discover')({
+export const Route = createFileRoute('/api/(levelling)/levelling-discover')({
   server: {
     handlers: {
       GET: async ({ request }) => {

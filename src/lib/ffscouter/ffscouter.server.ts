@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { FfScouterEstimate } from './levelling'
+import type { FfScouterEstimate } from '../levelling/levelling'
 
 const BASE_URL = 'https://ffscouter.com/api/v1'
 // FF Scouter accepts up to 205 IDs per request and caches results for five minutes.

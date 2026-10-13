@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter'
-import type { FfScouterKeyStatus } from '#/lib/ffscouter'
-import { verifyTornUser } from '#/lib/torn-user'
-import type { UserProfile } from '#/lib/torn-user'
+import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter/ffscouter'
+import type { FfScouterKeyStatus } from '#/lib/ffscouter/ffscouter'
+import { verifyTornUser } from '#/lib/torn/torn-user'
+import type { UserProfile } from '#/lib/torn/torn-user'
 
 export const Route = createFileRoute('/settings')({ component: Settings })
 

@@ -10,7 +10,7 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core'
 import type { FairFightObservation } from '../lib/battle-stats/estimator'
-import type { TravelSnapshot } from '../lib/travel'
+import type { TravelSnapshot } from '../lib/travel/travel'
 
 export const factionMemberTravel = pgTable('faction_member_travel', {
   playerId: text('player_id').primaryKey(),

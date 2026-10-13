@@ -1,5 +1,5 @@
-import type { BattleStatsEstimate } from './battle-stats/estimator'
-import type { BattleStatContributor } from './battle-stats/shared-evidence.server'
+import type { BattleStatsEstimate } from '../battle-stats/estimator'
+import type { BattleStatContributor } from '../battle-stats/shared-evidence.server'
 
 // Bundled player entries keep the spreadsheet format: numbers may be strings with commas.
 export type RawListPlayer = {

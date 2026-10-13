@@ -9,7 +9,7 @@ import {
   tierForLevel,
 } from './levelling'
 import { bundledPlayers } from './levelling.server'
-import { Route } from '../routes/api/levelling-targets'
+import { Route } from '../../routes/api/(levelling)/levelling-targets'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function' || !handlers.GET) {

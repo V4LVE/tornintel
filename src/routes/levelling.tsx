@@ -10,10 +10,14 @@ import type {
   LevellingPlayer,
   LevellingTargetsResponse,
   LevellingTier,
-} from '#/lib/levelling'
+} from '#/lib/levelling/levelling'
 import { BattleStatsCell } from '#/components/battle-stats-cell'
-import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter'
-import { LEVELLING_TIERS, playersInTier, tierForLevel } from '#/lib/levelling'
+import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter/ffscouter'
+import {
+  LEVELLING_TIERS,
+  playersInTier,
+  tierForLevel,
+} from '#/lib/levelling/levelling'
 
 export const Route = createFileRoute('/levelling')({ component: Levelling })
 

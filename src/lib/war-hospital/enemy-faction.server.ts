@@ -1,4 +1,4 @@
-import { fetchTorn, TornApiError } from './torn-api.server'
+import { fetchTorn, TornApiError } from '../torn/torn-api.server'
 
 // Torn codes for an incorrect, disabled, paused or jailed key.
 const KEY_ERRORS = new Set([2, 10, 13, 18])

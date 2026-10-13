@@ -14,18 +14,18 @@ import { Route as LevellingRouteImport } from './routes/levelling'
 import { Route as PayoutsRouteImport } from './routes/payouts'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WarDealsRouteImport } from './routes/war-deals'
-import { Route as ApiChainTargetRouteImport } from './routes/api/chain-target'
-import { Route as ApiCombatBarsRouteImport } from './routes/api/combat-bars'
-import { Route as ApiFactionMembersRouteImport } from './routes/api/faction-members'
-import { Route as ApiFfscouterKeyRouteImport } from './routes/api/ffscouter-key'
-import { Route as ApiLevellingDiscoverRouteImport } from './routes/api/levelling-discover'
-import { Route as ApiLevellingEstimatesRouteImport } from './routes/api/levelling-estimates'
-import { Route as ApiLevellingListRouteImport } from './routes/api/levelling-list'
-import { Route as ApiLevellingStatsRouteImport } from './routes/api/levelling-stats'
-import { Route as ApiLevellingTargetsRouteImport } from './routes/api/levelling-targets'
-import { Route as ApiPayoutHitsRouteImport } from './routes/api/payout-hits'
-import { Route as ApiUserRouteImport } from './routes/api/user'
-import { Route as ApiWarDealDefaultsRouteImport } from './routes/api/war-deal-defaults'
+import { Route as ApiaccountFfscouterKeyRouteImport } from './routes/api/(account)/ffscouter-key'
+import { Route as ApiaccountUserRouteImport } from './routes/api/(account)/user'
+import { Route as ApilevellingLevellingDiscoverRouteImport } from './routes/api/(levelling)/levelling-discover'
+import { Route as ApilevellingLevellingEstimatesRouteImport } from './routes/api/(levelling)/levelling-estimates'
+import { Route as ApilevellingLevellingListRouteImport } from './routes/api/(levelling)/levelling-list'
+import { Route as ApilevellingLevellingStatsRouteImport } from './routes/api/(levelling)/levelling-stats'
+import { Route as ApilevellingLevellingTargetsRouteImport } from './routes/api/(levelling)/levelling-targets'
+import { Route as ApipayoutsPayoutHitsRouteImport } from './routes/api/(payouts)/payout-hits'
+import { Route as ApiwarDealsWarDealDefaultsRouteImport } from './routes/api/(war-deals)/war-deal-defaults'
+import { Route as ApiwarHospitalChainTargetRouteImport } from './routes/api/(war-hospital)/chain-target'
+import { Route as ApiwarHospitalCombatBarsRouteImport } from './routes/api/(war-hospital)/combat-bars'
+import { Route as ApiwarHospitalFactionMembersRouteImport } from './routes/api/(war-hospital)/faction-members'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,66 +53,75 @@ const WarDealsRoute = WarDealsRouteImport.update({
   path: '/war-deals',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiChainTargetRoute = ApiChainTargetRouteImport.update({
-  id: '/api/chain-target',
-  path: '/api/chain-target',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiCombatBarsRoute = ApiCombatBarsRouteImport.update({
-  id: '/api/combat-bars',
-  path: '/api/combat-bars',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFactionMembersRoute = ApiFactionMembersRouteImport.update({
-  id: '/api/faction-members',
-  path: '/api/faction-members',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFfscouterKeyRoute = ApiFfscouterKeyRouteImport.update({
-  id: '/api/ffscouter-key',
+const ApiaccountFfscouterKeyRoute = ApiaccountFfscouterKeyRouteImport.update({
+  id: '/api/(account)/ffscouter-key',
   path: '/api/ffscouter-key',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiLevellingDiscoverRoute = ApiLevellingDiscoverRouteImport.update({
-  id: '/api/levelling-discover',
-  path: '/api/levelling-discover',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLevellingEstimatesRoute = ApiLevellingEstimatesRouteImport.update({
-  id: '/api/levelling-estimates',
-  path: '/api/levelling-estimates',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLevellingListRoute = ApiLevellingListRouteImport.update({
-  id: '/api/levelling-list',
-  path: '/api/levelling-list',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLevellingStatsRoute = ApiLevellingStatsRouteImport.update({
-  id: '/api/levelling-stats',
-  path: '/api/levelling-stats',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLevellingTargetsRoute = ApiLevellingTargetsRouteImport.update({
-  id: '/api/levelling-targets',
-  path: '/api/levelling-targets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPayoutHitsRoute = ApiPayoutHitsRouteImport.update({
-  id: '/api/payout-hits',
-  path: '/api/payout-hits',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiUserRoute = ApiUserRouteImport.update({
-  id: '/api/user',
+const ApiaccountUserRoute = ApiaccountUserRouteImport.update({
+  id: '/api/(account)/user',
   path: '/api/user',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWarDealDefaultsRoute = ApiWarDealDefaultsRouteImport.update({
-  id: '/api/war-deal-defaults',
-  path: '/api/war-deal-defaults',
+const ApilevellingLevellingDiscoverRoute =
+  ApilevellingLevellingDiscoverRouteImport.update({
+    id: '/api/(levelling)/levelling-discover',
+    path: '/api/levelling-discover',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApilevellingLevellingEstimatesRoute =
+  ApilevellingLevellingEstimatesRouteImport.update({
+    id: '/api/(levelling)/levelling-estimates',
+    path: '/api/levelling-estimates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApilevellingLevellingListRoute =
+  ApilevellingLevellingListRouteImport.update({
+    id: '/api/(levelling)/levelling-list',
+    path: '/api/levelling-list',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApilevellingLevellingStatsRoute =
+  ApilevellingLevellingStatsRouteImport.update({
+    id: '/api/(levelling)/levelling-stats',
+    path: '/api/levelling-stats',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApilevellingLevellingTargetsRoute =
+  ApilevellingLevellingTargetsRouteImport.update({
+    id: '/api/(levelling)/levelling-targets',
+    path: '/api/levelling-targets',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApipayoutsPayoutHitsRoute = ApipayoutsPayoutHitsRouteImport.update({
+  id: '/api/(payouts)/payout-hits',
+  path: '/api/payout-hits',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiwarDealsWarDealDefaultsRoute =
+  ApiwarDealsWarDealDefaultsRouteImport.update({
+    id: '/api/(war-deals)/war-deal-defaults',
+    path: '/api/war-deal-defaults',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiwarHospitalChainTargetRoute =
+  ApiwarHospitalChainTargetRouteImport.update({
+    id: '/api/(war-hospital)/chain-target',
+    path: '/api/chain-target',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiwarHospitalCombatBarsRoute =
+  ApiwarHospitalCombatBarsRouteImport.update({
+    id: '/api/(war-hospital)/combat-bars',
+    path: '/api/combat-bars',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiwarHospitalFactionMembersRoute =
+  ApiwarHospitalFactionMembersRouteImport.update({
+    id: '/api/(war-hospital)/faction-members',
+    path: '/api/faction-members',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -125,18 +134,18 @@ export interface FileRoutesByFullPath {
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
-  '/api/chain-target': typeof ApiChainTargetRoute
-  '/api/combat-bars': typeof ApiCombatBarsRoute
-  '/api/faction-members': typeof ApiFactionMembersRoute
-  '/api/ffscouter-key': typeof ApiFfscouterKeyRoute
-  '/api/levelling-discover': typeof ApiLevellingDiscoverRoute
-  '/api/levelling-estimates': typeof ApiLevellingEstimatesRoute
-  '/api/levelling-list': typeof ApiLevellingListRoute
-  '/api/levelling-stats': typeof ApiLevellingStatsRoute
-  '/api/levelling-targets': typeof ApiLevellingTargetsRoute
-  '/api/payout-hits': typeof ApiPayoutHitsRoute
-  '/api/user': typeof ApiUserRoute
-  '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
+  '/api/ffscouter-key': typeof ApiaccountFfscouterKeyRoute
+  '/api/user': typeof ApiaccountUserRoute
+  '/api/levelling-discover': typeof ApilevellingLevellingDiscoverRoute
+  '/api/levelling-estimates': typeof ApilevellingLevellingEstimatesRoute
+  '/api/levelling-list': typeof ApilevellingLevellingListRoute
+  '/api/levelling-stats': typeof ApilevellingLevellingStatsRoute
+  '/api/levelling-targets': typeof ApilevellingLevellingTargetsRoute
+  '/api/payout-hits': typeof ApipayoutsPayoutHitsRoute
+  '/api/war-deal-defaults': typeof ApiwarDealsWarDealDefaultsRoute
+  '/api/chain-target': typeof ApiwarHospitalChainTargetRoute
+  '/api/combat-bars': typeof ApiwarHospitalCombatBarsRoute
+  '/api/faction-members': typeof ApiwarHospitalFactionMembersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
@@ -145,18 +154,18 @@ export interface FileRoutesByTo {
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
-  '/api/chain-target': typeof ApiChainTargetRoute
-  '/api/combat-bars': typeof ApiCombatBarsRoute
-  '/api/faction-members': typeof ApiFactionMembersRoute
-  '/api/ffscouter-key': typeof ApiFfscouterKeyRoute
-  '/api/levelling-discover': typeof ApiLevellingDiscoverRoute
-  '/api/levelling-estimates': typeof ApiLevellingEstimatesRoute
-  '/api/levelling-list': typeof ApiLevellingListRoute
-  '/api/levelling-stats': typeof ApiLevellingStatsRoute
-  '/api/levelling-targets': typeof ApiLevellingTargetsRoute
-  '/api/payout-hits': typeof ApiPayoutHitsRoute
-  '/api/user': typeof ApiUserRoute
-  '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
+  '/api/ffscouter-key': typeof ApiaccountFfscouterKeyRoute
+  '/api/user': typeof ApiaccountUserRoute
+  '/api/levelling-discover': typeof ApilevellingLevellingDiscoverRoute
+  '/api/levelling-estimates': typeof ApilevellingLevellingEstimatesRoute
+  '/api/levelling-list': typeof ApilevellingLevellingListRoute
+  '/api/levelling-stats': typeof ApilevellingLevellingStatsRoute
+  '/api/levelling-targets': typeof ApilevellingLevellingTargetsRoute
+  '/api/payout-hits': typeof ApipayoutsPayoutHitsRoute
+  '/api/war-deal-defaults': typeof ApiwarDealsWarDealDefaultsRoute
+  '/api/chain-target': typeof ApiwarHospitalChainTargetRoute
+  '/api/combat-bars': typeof ApiwarHospitalCombatBarsRoute
+  '/api/faction-members': typeof ApiwarHospitalFactionMembersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -166,18 +175,18 @@ export interface FileRoutesById {
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
-  '/api/chain-target': typeof ApiChainTargetRoute
-  '/api/combat-bars': typeof ApiCombatBarsRoute
-  '/api/faction-members': typeof ApiFactionMembersRoute
-  '/api/ffscouter-key': typeof ApiFfscouterKeyRoute
-  '/api/levelling-discover': typeof ApiLevellingDiscoverRoute
-  '/api/levelling-estimates': typeof ApiLevellingEstimatesRoute
-  '/api/levelling-list': typeof ApiLevellingListRoute
-  '/api/levelling-stats': typeof ApiLevellingStatsRoute
-  '/api/levelling-targets': typeof ApiLevellingTargetsRoute
-  '/api/payout-hits': typeof ApiPayoutHitsRoute
-  '/api/user': typeof ApiUserRoute
-  '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
+  '/api/(account)/ffscouter-key': typeof ApiaccountFfscouterKeyRoute
+  '/api/(account)/user': typeof ApiaccountUserRoute
+  '/api/(levelling)/levelling-discover': typeof ApilevellingLevellingDiscoverRoute
+  '/api/(levelling)/levelling-estimates': typeof ApilevellingLevellingEstimatesRoute
+  '/api/(levelling)/levelling-list': typeof ApilevellingLevellingListRoute
+  '/api/(levelling)/levelling-stats': typeof ApilevellingLevellingStatsRoute
+  '/api/(levelling)/levelling-targets': typeof ApilevellingLevellingTargetsRoute
+  '/api/(payouts)/payout-hits': typeof ApipayoutsPayoutHitsRoute
+  '/api/(war-deals)/war-deal-defaults': typeof ApiwarDealsWarDealDefaultsRoute
+  '/api/(war-hospital)/chain-target': typeof ApiwarHospitalChainTargetRoute
+  '/api/(war-hospital)/combat-bars': typeof ApiwarHospitalCombatBarsRoute
+  '/api/(war-hospital)/faction-members': typeof ApiwarHospitalFactionMembersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
@@ -188,18 +197,18 @@ export interface FileRouteTypes {
     | '/payouts'
     | '/settings'
     | '/war-deals'
-    | '/api/chain-target'
-    | '/api/combat-bars'
-    | '/api/faction-members'
     | '/api/ffscouter-key'
+    | '/api/user'
     | '/api/levelling-discover'
     | '/api/levelling-estimates'
     | '/api/levelling-list'
     | '/api/levelling-stats'
     | '/api/levelling-targets'
     | '/api/payout-hits'
-    | '/api/user'
     | '/api/war-deal-defaults'
+    | '/api/chain-target'
+    | '/api/combat-bars'
+    | '/api/faction-members'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -208,18 +217,18 @@ export interface FileRouteTypes {
     | '/payouts'
     | '/settings'
     | '/war-deals'
-    | '/api/chain-target'
-    | '/api/combat-bars'
-    | '/api/faction-members'
     | '/api/ffscouter-key'
+    | '/api/user'
     | '/api/levelling-discover'
     | '/api/levelling-estimates'
     | '/api/levelling-list'
     | '/api/levelling-stats'
     | '/api/levelling-targets'
     | '/api/payout-hits'
-    | '/api/user'
     | '/api/war-deal-defaults'
+    | '/api/chain-target'
+    | '/api/combat-bars'
+    | '/api/faction-members'
     | '/api/auth/$'
   id:
     | '__root__'
@@ -228,18 +237,18 @@ export interface FileRouteTypes {
     | '/payouts'
     | '/settings'
     | '/war-deals'
-    | '/api/chain-target'
-    | '/api/combat-bars'
-    | '/api/faction-members'
-    | '/api/ffscouter-key'
-    | '/api/levelling-discover'
-    | '/api/levelling-estimates'
-    | '/api/levelling-list'
-    | '/api/levelling-stats'
-    | '/api/levelling-targets'
-    | '/api/payout-hits'
-    | '/api/user'
-    | '/api/war-deal-defaults'
+    | '/api/(account)/ffscouter-key'
+    | '/api/(account)/user'
+    | '/api/(levelling)/levelling-discover'
+    | '/api/(levelling)/levelling-estimates'
+    | '/api/(levelling)/levelling-list'
+    | '/api/(levelling)/levelling-stats'
+    | '/api/(levelling)/levelling-targets'
+    | '/api/(payouts)/payout-hits'
+    | '/api/(war-deals)/war-deal-defaults'
+    | '/api/(war-hospital)/chain-target'
+    | '/api/(war-hospital)/combat-bars'
+    | '/api/(war-hospital)/faction-members'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -249,18 +258,18 @@ export interface RootRouteChildren {
   PayoutsRoute: typeof PayoutsRoute
   SettingsRoute: typeof SettingsRoute
   WarDealsRoute: typeof WarDealsRoute
-  ApiChainTargetRoute: typeof ApiChainTargetRoute
-  ApiCombatBarsRoute: typeof ApiCombatBarsRoute
-  ApiFactionMembersRoute: typeof ApiFactionMembersRoute
-  ApiFfscouterKeyRoute: typeof ApiFfscouterKeyRoute
-  ApiLevellingDiscoverRoute: typeof ApiLevellingDiscoverRoute
-  ApiLevellingEstimatesRoute: typeof ApiLevellingEstimatesRoute
-  ApiLevellingListRoute: typeof ApiLevellingListRoute
-  ApiLevellingStatsRoute: typeof ApiLevellingStatsRoute
-  ApiLevellingTargetsRoute: typeof ApiLevellingTargetsRoute
-  ApiPayoutHitsRoute: typeof ApiPayoutHitsRoute
-  ApiUserRoute: typeof ApiUserRoute
-  ApiWarDealDefaultsRoute: typeof ApiWarDealDefaultsRoute
+  ApiaccountFfscouterKeyRoute: typeof ApiaccountFfscouterKeyRoute
+  ApiaccountUserRoute: typeof ApiaccountUserRoute
+  ApilevellingLevellingDiscoverRoute: typeof ApilevellingLevellingDiscoverRoute
+  ApilevellingLevellingEstimatesRoute: typeof ApilevellingLevellingEstimatesRoute
+  ApilevellingLevellingListRoute: typeof ApilevellingLevellingListRoute
+  ApilevellingLevellingStatsRoute: typeof ApilevellingLevellingStatsRoute
+  ApilevellingLevellingTargetsRoute: typeof ApilevellingLevellingTargetsRoute
+  ApipayoutsPayoutHitsRoute: typeof ApipayoutsPayoutHitsRoute
+  ApiwarDealsWarDealDefaultsRoute: typeof ApiwarDealsWarDealDefaultsRoute
+  ApiwarHospitalChainTargetRoute: typeof ApiwarHospitalChainTargetRoute
+  ApiwarHospitalCombatBarsRoute: typeof ApiwarHospitalCombatBarsRoute
+  ApiwarHospitalFactionMembersRoute: typeof ApiwarHospitalFactionMembersRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -301,88 +310,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WarDealsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/chain-target': {
-      id: '/api/chain-target'
-      path: '/api/chain-target'
-      fullPath: '/api/chain-target'
-      preLoaderRoute: typeof ApiChainTargetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/combat-bars': {
-      id: '/api/combat-bars'
-      path: '/api/combat-bars'
-      fullPath: '/api/combat-bars'
-      preLoaderRoute: typeof ApiCombatBarsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/faction-members': {
-      id: '/api/faction-members'
-      path: '/api/faction-members'
-      fullPath: '/api/faction-members'
-      preLoaderRoute: typeof ApiFactionMembersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ffscouter-key': {
-      id: '/api/ffscouter-key'
+    '/api/(account)/ffscouter-key': {
+      id: '/api/(account)/ffscouter-key'
       path: '/api/ffscouter-key'
       fullPath: '/api/ffscouter-key'
-      preLoaderRoute: typeof ApiFfscouterKeyRouteImport
+      preLoaderRoute: typeof ApiaccountFfscouterKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/levelling-discover': {
-      id: '/api/levelling-discover'
-      path: '/api/levelling-discover'
-      fullPath: '/api/levelling-discover'
-      preLoaderRoute: typeof ApiLevellingDiscoverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/levelling-estimates': {
-      id: '/api/levelling-estimates'
-      path: '/api/levelling-estimates'
-      fullPath: '/api/levelling-estimates'
-      preLoaderRoute: typeof ApiLevellingEstimatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/levelling-list': {
-      id: '/api/levelling-list'
-      path: '/api/levelling-list'
-      fullPath: '/api/levelling-list'
-      preLoaderRoute: typeof ApiLevellingListRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/levelling-stats': {
-      id: '/api/levelling-stats'
-      path: '/api/levelling-stats'
-      fullPath: '/api/levelling-stats'
-      preLoaderRoute: typeof ApiLevellingStatsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/levelling-targets': {
-      id: '/api/levelling-targets'
-      path: '/api/levelling-targets'
-      fullPath: '/api/levelling-targets'
-      preLoaderRoute: typeof ApiLevellingTargetsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/payout-hits': {
-      id: '/api/payout-hits'
-      path: '/api/payout-hits'
-      fullPath: '/api/payout-hits'
-      preLoaderRoute: typeof ApiPayoutHitsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/user': {
-      id: '/api/user'
+    '/api/(account)/user': {
+      id: '/api/(account)/user'
       path: '/api/user'
       fullPath: '/api/user'
-      preLoaderRoute: typeof ApiUserRouteImport
+      preLoaderRoute: typeof ApiaccountUserRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/war-deal-defaults': {
-      id: '/api/war-deal-defaults'
+    '/api/(levelling)/levelling-discover': {
+      id: '/api/(levelling)/levelling-discover'
+      path: '/api/levelling-discover'
+      fullPath: '/api/levelling-discover'
+      preLoaderRoute: typeof ApilevellingLevellingDiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(levelling)/levelling-estimates': {
+      id: '/api/(levelling)/levelling-estimates'
+      path: '/api/levelling-estimates'
+      fullPath: '/api/levelling-estimates'
+      preLoaderRoute: typeof ApilevellingLevellingEstimatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(levelling)/levelling-list': {
+      id: '/api/(levelling)/levelling-list'
+      path: '/api/levelling-list'
+      fullPath: '/api/levelling-list'
+      preLoaderRoute: typeof ApilevellingLevellingListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(levelling)/levelling-stats': {
+      id: '/api/(levelling)/levelling-stats'
+      path: '/api/levelling-stats'
+      fullPath: '/api/levelling-stats'
+      preLoaderRoute: typeof ApilevellingLevellingStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(levelling)/levelling-targets': {
+      id: '/api/(levelling)/levelling-targets'
+      path: '/api/levelling-targets'
+      fullPath: '/api/levelling-targets'
+      preLoaderRoute: typeof ApilevellingLevellingTargetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(payouts)/payout-hits': {
+      id: '/api/(payouts)/payout-hits'
+      path: '/api/payout-hits'
+      fullPath: '/api/payout-hits'
+      preLoaderRoute: typeof ApipayoutsPayoutHitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(war-deals)/war-deal-defaults': {
+      id: '/api/(war-deals)/war-deal-defaults'
       path: '/api/war-deal-defaults'
       fullPath: '/api/war-deal-defaults'
-      preLoaderRoute: typeof ApiWarDealDefaultsRouteImport
+      preLoaderRoute: typeof ApiwarDealsWarDealDefaultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(war-hospital)/chain-target': {
+      id: '/api/(war-hospital)/chain-target'
+      path: '/api/chain-target'
+      fullPath: '/api/chain-target'
+      preLoaderRoute: typeof ApiwarHospitalChainTargetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(war-hospital)/combat-bars': {
+      id: '/api/(war-hospital)/combat-bars'
+      path: '/api/combat-bars'
+      fullPath: '/api/combat-bars'
+      preLoaderRoute: typeof ApiwarHospitalCombatBarsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/(war-hospital)/faction-members': {
+      id: '/api/(war-hospital)/faction-members'
+      path: '/api/faction-members'
+      fullPath: '/api/faction-members'
+      preLoaderRoute: typeof ApiwarHospitalFactionMembersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -401,18 +410,18 @@ const rootRouteChildren: RootRouteChildren = {
   PayoutsRoute: PayoutsRoute,
   SettingsRoute: SettingsRoute,
   WarDealsRoute: WarDealsRoute,
-  ApiChainTargetRoute: ApiChainTargetRoute,
-  ApiCombatBarsRoute: ApiCombatBarsRoute,
-  ApiFactionMembersRoute: ApiFactionMembersRoute,
-  ApiFfscouterKeyRoute: ApiFfscouterKeyRoute,
-  ApiLevellingDiscoverRoute: ApiLevellingDiscoverRoute,
-  ApiLevellingEstimatesRoute: ApiLevellingEstimatesRoute,
-  ApiLevellingListRoute: ApiLevellingListRoute,
-  ApiLevellingStatsRoute: ApiLevellingStatsRoute,
-  ApiLevellingTargetsRoute: ApiLevellingTargetsRoute,
-  ApiPayoutHitsRoute: ApiPayoutHitsRoute,
-  ApiUserRoute: ApiUserRoute,
-  ApiWarDealDefaultsRoute: ApiWarDealDefaultsRoute,
+  ApiaccountFfscouterKeyRoute: ApiaccountFfscouterKeyRoute,
+  ApiaccountUserRoute: ApiaccountUserRoute,
+  ApilevellingLevellingDiscoverRoute: ApilevellingLevellingDiscoverRoute,
+  ApilevellingLevellingEstimatesRoute: ApilevellingLevellingEstimatesRoute,
+  ApilevellingLevellingListRoute: ApilevellingLevellingListRoute,
+  ApilevellingLevellingStatsRoute: ApilevellingLevellingStatsRoute,
+  ApilevellingLevellingTargetsRoute: ApilevellingLevellingTargetsRoute,
+  ApipayoutsPayoutHitsRoute: ApipayoutsPayoutHitsRoute,
+  ApiwarDealsWarDealDefaultsRoute: ApiwarDealsWarDealDefaultsRoute,
+  ApiwarHospitalChainTargetRoute: ApiwarHospitalChainTargetRoute,
+  ApiwarHospitalCombatBarsRoute: ApiwarHospitalCombatBarsRoute,
+  ApiwarHospitalFactionMembersRoute: ApiwarHospitalFactionMembersRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

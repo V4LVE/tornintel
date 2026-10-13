@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { resolveEnemyFaction } from '#/lib/enemy-faction.server'
-import type { EnemyFaction } from '#/lib/enemy-faction.server'
-import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
-import { syncTravelTracking } from '#/lib/travel.server'
-import type { MemberStatus, TravelEstimate } from '#/lib/travel'
+import { resolveEnemyFaction } from '#/lib/war-hospital/enemy-faction.server'
+import type { EnemyFaction } from '#/lib/war-hospital/enemy-faction.server'
+import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
+import { syncTravelTracking } from '#/lib/travel/travel.server'
+import type { MemberStatus, TravelEstimate } from '#/lib/travel/travel'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
 import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
 import { estimateBattleStats } from '#/lib/battle-stats/estimator'
@@ -27,7 +27,7 @@ type TornFactionResponse = {
 
 const THIRTY_MINUTES = 30 * 60 * 1000
 
-export const Route = createFileRoute('/api/faction-members')({
+export const Route = createFileRoute('/api/(war-hospital)/faction-members')({
   server: {
     handlers: {
       GET: async ({ request }) => {

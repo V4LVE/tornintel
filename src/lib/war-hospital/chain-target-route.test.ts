@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Route } from '../../routes/api/chain-target'
+import { Route } from '../../routes/api/(war-hospital)/chain-target'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function' || !handlers.GET) {

@@ -1,13 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ffScouter, ffScouterKeyFrom } from '#/lib/ffscouter.server'
-import { LEVELLING_TIERS } from '#/lib/levelling'
-import type { LevellingListResponse } from '#/lib/levelling'
+import { ffScouter, ffScouterKeyFrom } from '#/lib/ffscouter/ffscouter.server'
+import { LEVELLING_TIERS } from '#/lib/levelling/levelling'
+import type { LevellingListResponse } from '#/lib/levelling/levelling'
 import {
   isLevellingEditor,
   levellingListRepository,
   loadLevellingPlayers,
-} from '#/lib/levelling.server'
-import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+} from '#/lib/levelling/levelling.server'
+import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 
 type BasicProfile = {
   player_id?: number
@@ -25,7 +25,7 @@ const MAX_LEVEL = Math.max(
   ...Object.values(LEVELLING_TIERS).map((tier) => tier.max),
 )
 
-export const Route = createFileRoute('/api/levelling-list')({
+export const Route = createFileRoute('/api/(levelling)/levelling-list')({
   server: {
     handlers: {
       GET: async ({ request }) => {

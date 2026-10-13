@@ -1,4 +1,4 @@
-import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 import { calculateBalanceFactor, calculateBattleStatScore } from './estimator'
 import type { BattleStats, FairFightObservation } from './estimator'
 import type { SharedObservation } from './shared-evidence.server'

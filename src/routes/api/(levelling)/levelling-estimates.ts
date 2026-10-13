@@ -3,14 +3,14 @@ import {
   ffScouter,
   ffScouterErrorResponse,
   ffScouterKeyFrom,
-} from '#/lib/ffscouter.server'
-import type { LevellingEstimatesResponse } from '#/lib/levelling'
+} from '#/lib/ffscouter/ffscouter.server'
+import type { LevellingEstimatesResponse } from '#/lib/levelling/levelling'
 
 const headers = { 'Cache-Control': 'no-store' }
 // Enough for the largest tier, including players added in tornintel.
 const MAX_IDS = 410
 
-export const Route = createFileRoute('/api/levelling-estimates')({
+export const Route = createFileRoute('/api/(levelling)/levelling-estimates')({
   server: {
     handlers: {
       GET: async ({ request }) => {

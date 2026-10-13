@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createFfScouterClient, FfScouterError } from './ffscouter.server'
-import { bundledPlayers } from './levelling.server'
-import { Route as DiscoverRoute } from '../routes/api/levelling-discover'
-import { Route as EstimatesRoute } from '../routes/api/levelling-estimates'
-import { Route as KeyRoute } from '../routes/api/ffscouter-key'
-import { Route as ListRoute } from '../routes/api/levelling-list'
+import { bundledPlayers } from '../levelling/levelling.server'
+import { Route as DiscoverRoute } from '../../routes/api/(levelling)/levelling-discover'
+import { Route as EstimatesRoute } from '../../routes/api/(levelling)/levelling-estimates'
+import { Route as KeyRoute } from '../../routes/api/(account)/ffscouter-key'
+import { Route as ListRoute } from '../../routes/api/(levelling)/levelling-list'
 
 function handlerFor(route: { options: { server?: { handlers?: unknown } } }) {
   const handlers = route.options.server?.handlers as

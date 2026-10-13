@@ -2,13 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { estimateBattleStats } from '#/lib/battle-stats/estimator'
 import { loadFairFightEvidence } from '#/lib/battle-stats/fair-fight-evidence.server'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
-import type { LevellingStatsResponse } from '#/lib/levelling'
+import type { LevellingStatsResponse } from '#/lib/levelling/levelling'
 
 const headers = { 'Cache-Control': 'no-store' }
 // Enough for the largest tier, including players added in tornintel.
 const MAX_IDS = 600
 
-export const Route = createFileRoute('/api/levelling-stats')({
+export const Route = createFileRoute('/api/(levelling)/levelling-stats')({
   server: {
     handlers: {
       GET: async ({ request }) => {

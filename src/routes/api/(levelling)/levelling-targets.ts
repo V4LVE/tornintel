@@ -1,8 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type { LevellingTarget, LevellingTargetsResponse } from '#/lib/levelling'
-import { isLevellingTier, playersInTier, shuffle } from '#/lib/levelling'
-import { loadLevellingPlayers } from '#/lib/levelling.server'
-import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+import type {
+  LevellingTarget,
+  LevellingTargetsResponse,
+} from '#/lib/levelling/levelling'
+import {
+  isLevellingTier,
+  playersInTier,
+  shuffle,
+} from '#/lib/levelling/levelling'
+import { loadLevellingPlayers } from '#/lib/levelling/levelling.server'
+import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 
 type BasicProfile = {
   player_id?: number
@@ -17,7 +24,7 @@ const MAX_PROFILE_CHECKS = 12
 const BATCH_SIZE = 3
 const INCORRECT_ID = 6
 
-export const Route = createFileRoute('/api/levelling-targets')({
+export const Route = createFileRoute('/api/(levelling)/levelling-targets')({
   server: {
     handlers: {
       GET: async ({ request }) => {

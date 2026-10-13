@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type { ChainTargetResponse } from '#/lib/chain-target'
-import { fetchTorn } from '#/lib/torn-api.server'
+import type { ChainTargetResponse } from '#/lib/war-hospital/chain-target'
+import { fetchTorn } from '#/lib/torn/torn-api.server'
 
 type Attack = {
   attacker_id?: number
@@ -44,7 +44,7 @@ async function loadProfile(
   return { profile, fetchedAt }
 }
 
-export const Route = createFileRoute('/api/chain-target')({
+export const Route = createFileRoute('/api/(war-hospital)/chain-target')({
   server: {
     handlers: {
       GET: async ({ request }) => {

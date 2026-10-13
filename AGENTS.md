@@ -21,7 +21,7 @@ Before editing files for a substantial task:
 ```bash
 npm run dev              # dev server on http://localhost:3000
 npm run build            # production build (.output/); also regenerates src/routeTree.gen.ts
-npm test                 # tsx --test src/lib/*.test.ts src/lib/battle-stats/*.test.ts
+npm test                 # tsx --test "src/**/*.test.ts"
 npm run lint             # eslint
 npx tsc --noEmit
 npx prettier --check --end-of-line auto src README.md
@@ -29,7 +29,7 @@ npm run db:generate      # new migration after changing src/db/schema.ts
 npm run db:migrate       # run migrations against DATABASE_URL
 ```
 
-- Tests must live in `src/lib/` or `src/lib/battle-stats/`; the test glob misses anything else.
+- Tests live next to the code they cover (`*.test.ts` anywhere under `src/`). The glob is quoted so Node expands `**` on every shell.
 - `drizzle-kit generate` needs `DATABASE_URL` but does not connect: `DATABASE_URL=postgres://u:p@localhost:5432/x npm run db:generate` is enough.
 - Integration tests against a real Postgres only run with `TORNINTEL_DB_TEST=1`.
 
@@ -57,10 +57,36 @@ npm run db:migrate       # run migrations against DATABASE_URL
 
 `__root.tsx` holds the shell, favicon links, the theme boot script and `notFoundComponent`.
 
+### Folder structure
+
+Code is grouped by feature. Put new files in the matching feature folder, with tests next to them:
+
+```
+src/
+  components/            shared React components
+  db/                    Drizzle client and schema
+  lib/
+    torn/                Torn API client (fetchTorn) and key verification
+    war-hospital/        enemy faction resolution, chain target types, dashboard route tests
+    travel/              flight tracking
+    battle-stats/        TBS estimator and Fair Fight evidence
+    levelling/           tiers, bundled players.json, shared list changes
+    ffscouter/           FF Scouter client
+    war-deals/           war deal logic and data loading
+    auth/                Better Auth scaffolding
+    hooks/               React hooks (use-visible-polling)
+  routes/                pages (file name = URL)
+    api/(<feature>)/     API routes grouped per feature
+```
+
+API route folders in parentheses are TanStack route groups: they organize files without changing the URL (`src/routes/api/(levelling)/levelling-list.ts` serves `/api/levelling-list`). The generator writes the group into the route id (`createFileRoute('/api/(levelling)/levelling-list')`); leave that as generated. A new API route goes in the group of its feature, or a new group.
+
 ### API routes (`src/routes/api/`)
 
-- **`user`**: verifies the key (used by `verifyTornUser` in `src/lib/torn-user.ts`).
-- **`faction-members`**: opposing members with status, travel and TBS. Without `factionId`, `src/lib/enemy-faction.server.ts` picks the opponent in the current or upcoming ranked war, then the last ranked war, then `TORN_ENEMY_FACTION_ID`.
+Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling)` levelling-*; `(account)` user, ffscouter-key; `(payouts)` payout-hits; `(war-deals)` war-deal-defaults; `auth/$`.
+
+- **`user`**: verifies the key (used by `verifyTornUser` in `src/lib/torn/torn-user.ts`).
+- **`faction-members`**: opposing members with status, travel and TBS. Without `factionId`, `src/lib/war-hospital/enemy-faction.server.ts` picks the opponent in the current or upcoming ranked war, then the last ranked war, then `TORN_ENEMY_FACTION_ID`.
 - **`combat-bars`** and **`chain-target`**: energy and chain, plus a keep-alive target from the viewer's recent solo wins.
 - **`payout-hits`** and **`war-deal-defaults`**: data for payouts and war deals.
 - **`levelling-list`**:
@@ -74,17 +100,17 @@ npm run db:migrate       # run migrations against DATABASE_URL
 
 ### Server lib (`src/lib/`)
 
-- **`torn-api.server.ts`**: `fetchTorn(url, { maxAgeMs, signal?, cacheWhen? })`. It keeps a per-process cache (256 entries) keyed by a sha256 hash of the URL, so API keys never appear in cache keys. Concurrent identical calls share one request. It throws `TornApiError(message, code)`. `cacheWhen` is used, for example, to cache only players who are not `Okay`, so available targets are always rechecked.
+- **`torn/torn-api.server.ts`**: `fetchTorn(url, { maxAgeMs, signal?, cacheWhen? })`. It keeps a per-process cache (256 entries) keyed by a sha256 hash of the URL, so API keys never appear in cache keys. Concurrent identical calls share one request. It throws `TornApiError(message, code)`. `cacheWhen` is used, for example, to cache only players who are not `Okay`, so available targets are always rechecked.
 - **`battle-stats/`**:
   - `estimator.ts`: `estimateBattleStats`; BSS is the sum of the square roots of the four stats.
   - `fair-fight-evidence.server.ts`: loads the viewer's own attacks via v1 `profile,battlestats,attacks`. v1 is deliberate: a Limited key can fetch its own stats and attacks together there. Only the last 14 days count, because only current stats are known.
   - `shared-evidence.server.ts`: saves and loads shared evidence. The first observation per `evidenceId` is kept.
-- **`travel.ts` / `travel.server.ts`**: flight tracking and arrival windows, stored in Postgres with row locks and an in-memory fallback.
-- **`levelling.ts` / `levelling.server.ts`**: tiers (`LEVELLING_TIERS`, `tierForLevel`), normalizing `src/lib/levelling/players.json`, and `applyListChanges`.
-- **`ffscouter.ts` / `ffscouter.server.ts`**: FF Scouter client. Estimates are cached for 5 minutes per key, because fair fight is relative to the key owner. `ffScouterKeyFrom(request)` uses `X-FfScouter-Key` and falls back to the Torn key.
-- **`war-deal*.ts`**: war deal summaries, message generation and Torn data loading.
-- **`chain-target.ts`**: response types for the keep-alive target.
-- **`use-visible-polling.ts`**: polling without overlapping requests, only while the tab is visible.
+- **`travel/`** (`travel.ts`, `travel.server.ts`): flight tracking and arrival windows, stored in Postgres with row locks and an in-memory fallback.
+- **`levelling/`** (`levelling.ts`, `levelling.server.ts`): tiers (`LEVELLING_TIERS`, `tierForLevel`), normalizing `src/lib/levelling/players.json`, and `applyListChanges`.
+- **`ffscouter/`** (`ffscouter.ts`, `ffscouter.server.ts`): FF Scouter client. Estimates are cached for 5 minutes per key, because fair fight is relative to the key owner. `ffScouterKeyFrom(request)` uses `X-FfScouter-Key` and falls back to the Torn key.
+- **`war-deals/`**: war deal summaries, message generation and Torn data loading.
+- **`war-hospital/`**: `enemy-faction.server.ts` and `chain-target.ts` (response types for the keep-alive target).
+- **`hooks/use-visible-polling.ts`**: polling without overlapping requests, only while the tab is visible.
 
 ### Components (`src/components/`)
 

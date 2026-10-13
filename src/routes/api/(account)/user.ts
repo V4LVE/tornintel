@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchTorn, TornApiError } from '#/lib/torn-api.server'
+import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 
 type TornUserResponse = {
   player_id?: number
@@ -9,7 +9,7 @@ type TornUserResponse = {
   error?: { error: string; code: number }
 }
 
-export const Route = createFileRoute('/api/user')({
+export const Route = createFileRoute('/api/(account)/user')({
   server: {
     handlers: {
       GET: async ({ request }) => {

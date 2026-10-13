@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Route } from '../routes/api/levelling-stats'
+import { Route } from '../../routes/api/(levelling)/levelling-stats'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function' || !handlers.GET) {

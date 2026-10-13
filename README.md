@@ -25,9 +25,9 @@ npm start
 - `src/routes/war-deals.tsx`: war deal planning and editable proposals for both outcomes. With a saved API key, faction names, current war target, item market prices, and each faction's latest completed cache rewards load automatically. Cache counts are a labeled historical baseline, not a prediction for the entered scores; all values can be adjusted manually. Compensation uses the losing faction's score, with whole items and a cash remainder. Payment wording appears only when a rate or timing is supplied. Manual planning remains available without an API key at `/war-deals`.
 - `src/routes/levelling.tsx`: levelling targets grouped into tiers of ten levels.
 - `src/routes/settings.tsx`: API key and connected account settings.
-- `src/routes/api/`: server endpoints that request Torn data.
-- `src/lib/battle-stats/`: Fair Fight based estimates and tests.
-- `src/lib/torn-user.ts`: shared client-side user verification and profile type.
+- `src/routes/api/`: server endpoints, grouped per feature in route-group folders such as `(levelling)/` that do not change the URL.
+- `src/lib/<feature>/`: logic per feature (`torn`, `war-hospital`, `travel`, `battle-stats`, `levelling`, `ffscouter`, `war-deals`, `auth`, `hooks`), with tests next to the code.
+- `src/components/`: shared React components.
 - `src/styles.css`: application styles. Colors are CSS variables with dark and light values at the top of the file; the theme button in the war hospital top bar switches between them and is remembered in the browser.
 
 The router generates `src/routeTree.gen.ts` when routes change. Do not edit it by hand.

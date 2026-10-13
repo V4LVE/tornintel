@@ -1,9 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ffScouter, ffScouterErrorResponse } from '#/lib/ffscouter.server'
+import {
+  ffScouter,
+  ffScouterErrorResponse,
+} from '#/lib/ffscouter/ffscouter.server'
 
 const headers = { 'Cache-Control': 'no-store' }
 
-export const Route = createFileRoute('/api/ffscouter-key')({
+export const Route = createFileRoute('/api/(account)/ffscouter-key')({
   server: {
     handlers: {
       GET: async ({ request }) => {

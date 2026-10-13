@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { resolveEnemyFaction } from './enemy-faction.server'
-import { Route } from '../routes/api/faction-members'
+import { Route } from '../../routes/api/(war-hospital)/faction-members'
 
 const OWN = { id: 100, name: 'Us' }
 

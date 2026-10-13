@@ -2009,7 +2009,7 @@ td {
   flex-wrap: wrap;
   gap: 26px;
 }
-.my-stats-controls .filter-tabs {
+.my-stats-controls .table-tabs {
   height: 30px;
   gap: 16px;
 }
@@ -2212,7 +2212,7 @@ td {
   gap: 22px;
   padding: 14px 24px 16px;
 }
-.faction-stats-breakdown > div:not(.filter-tabs) {
+.faction-stats-breakdown > div:not(.table-tabs) {
   display: grid;
   gap: 3px;
 }
@@ -2229,7 +2229,7 @@ td {
   font-style: normal;
   font-size: 10px;
 }
-.faction-stats-breakdown .filter-tabs {
+.faction-stats-breakdown .table-tabs {
   margin-left: auto;
   height: 26px;
   gap: 16px;

@@ -69,12 +69,22 @@ const HISTORIC_STATS: Record<string, StatName | 'total'> = {
 }
 export const HISTORIC_STAT_QUERY = Object.keys(HISTORIC_STATS).join(',')
 
+/** One entry of Torn's v2 historical personalstats (timestamp in unix seconds). */
+export type HistoricPersonalStat = {
+  name: string
+  value: number
+  timestamp?: number
+}
+
+/** A reading with when Torn observed it (unix seconds), used to order readings within a day. */
+export type ObservedStatPoint = StatPoint & { observedAt: number }
+
 /**
  * Converts Torn's v2 personalstats list into a StatPoint.
  * Returns null when Torn has no record of all four stats at that time.
  */
 export function parsePersonalStats(
-  list: { name: string; value: number }[] | undefined,
+  list: HistoricPersonalStat[] | undefined,
   timestamp: number,
 ): StatPoint | null {
   const point: Partial<StatPoint> = { timestamp }
@@ -85,6 +95,26 @@ export function parsePersonalStats(
   if (STAT_NAMES.some((stat) => point[stat] === undefined)) return null
   point.total ??= STAT_NAMES.reduce((sum, stat) => sum + point[stat]!, 0)
   return point as StatPoint
+}
+
+/**
+ * When Torn recorded the stats in a historical reading: the latest stat
+ * timestamp, never after the requested time. Falls back to the requested time
+ * when Torn sends no timestamps.
+ */
+export function personalStatsObservedAt(
+  list: HistoricPersonalStat[] | undefined,
+  requested: number,
+): number {
+  const recorded = (list ?? [])
+    .filter(({ name }) => name in HISTORIC_STATS)
+    .map((stat) => stat.timestamp)
+    .filter(
+      (value): value is number =>
+        typeof value === 'number' && Number.isFinite(value) && value > 0,
+    )
+  if (recorded.length === 0) return Math.floor(requested)
+  return Math.floor(Math.min(Math.max(...recorded), requested))
 }
 
 export function toStatPoint(stats: BattleStats, timestamp: number): StatPoint {

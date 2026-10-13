@@ -3,17 +3,20 @@ import { test } from 'node:test'
 import type { TestContext } from 'node:test'
 import { Route as FactionStatsRoute } from '../../routes/api/(my-stats)/faction-stats'
 import { Route as StatSharingRoute } from '../../routes/api/(my-stats)/stat-sharing'
+import { Route as HistoryRoute } from '../../routes/api/(my-stats)/my-stats-history'
 import {
   recordSharedStats,
   statSharingRepository,
 } from './faction-sharing.server'
+import { dayEnd } from './my-stats'
 import type { FactionStatsResponse } from './my-stats'
 
 let nextKey = 0
 const freshKey = () => `sharing-test-${++nextKey}`
 
 function getHandler(
-  route: typeof FactionStatsRoute | typeof StatSharingRoute,
+  route:
+    typeof FactionStatsRoute | typeof StatSharingRoute | typeof HistoryRoute,
   method: 'GET' | 'POST',
 ) {
   const handlers = route.options.server?.handlers
@@ -234,6 +237,50 @@ test('enables sharing for the key owner and records their current stats', async 
     assert.equal(owner.id, '1')
     assert.equal(owner.factionId, '555')
     assert.equal(points[0].total, 40)
+    assert.equal(points[0].timestamp, dayEnd(points[0].observedAt))
+  })
+})
+
+test('records a historical reading with the time Torn observed it', async (context) => {
+  await withDatabase(async () => {
+    context.mock.method(
+      globalThis,
+      'fetch',
+      async (input: string | URL | Request) => {
+        const url = new URL(String(input))
+        if (url.pathname === '/v2/user/personalstats')
+          return Response.json({
+            personalstats: [
+              { name: 'strength', value: 10, timestamp: 1699990000 },
+              { name: 'defense', value: 10, timestamp: 1699995000 },
+              { name: 'speed', value: 10, timestamp: 1699990000 },
+              { name: 'dexterity', value: 10, timestamp: 1699990000 },
+            ],
+          })
+        return Response.json({ player_id: 1, name: 'Alice' })
+      },
+    )
+    const record = context.mock.method(
+      statSharingRepository,
+      'record',
+      async () => {},
+    )
+    const response = await getHandler(
+      HistoryRoute,
+      'GET',
+    )({
+      request: new Request(
+        'http://localhost/api/my-stats-history?timestamp=1700000000',
+        { headers: { 'x-torn-api-key': freshKey() } },
+      ),
+    })
+    assert.ok(response instanceof Response)
+    assert.equal(response.status, 200)
+    const [, points] = record.mock.calls[0].arguments as Parameters<
+      typeof statSharingRepository.record
+    >
+    assert.equal(points[0].timestamp, dayEnd(1700000000))
+    assert.equal(points[0].observedAt, 1699995000)
   })
 })
 
@@ -267,6 +314,7 @@ test('does not contact Torn to record stats when no database is configured', asy
     await recordSharedStats(freshKey(), [
       {
         timestamp: 1700000000,
+        observedAt: 1700000000,
         strength: 1,
         defense: 1,
         speed: 1,

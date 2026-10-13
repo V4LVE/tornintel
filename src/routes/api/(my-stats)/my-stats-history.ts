@@ -3,12 +3,14 @@ import { fetchTorn } from '#/lib/torn/torn-api.server'
 import {
   HISTORIC_STAT_QUERY,
   parsePersonalStats,
+  personalStatsObservedAt,
 } from '#/lib/battle-stats/my-stats'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
 import { recordSharedStats } from '#/lib/battle-stats/faction-sharing.server'
+import type { HistoricPersonalStat } from '#/lib/battle-stats/my-stats'
 
 type TornPersonalStatsResponse = {
-  personalstats?: { name: string; value: number }[]
+  personalstats?: HistoricPersonalStat[]
 }
 
 // Past readings never change, so they can be reused for a day.
@@ -49,7 +51,17 @@ export const Route = createFileRoute('/api/(my-stats)/my-stats-history')({
             maxAgeMs: HISTORY_MAX_AGE_MS,
           })
           const point = parsePersonalStats(data.personalstats, timestamp)
-          if (point) await recordSharedStats(apiKey, [point])
+          if (point) {
+            await recordSharedStats(apiKey, [
+              {
+                ...point,
+                observedAt: personalStatsObservedAt(
+                  data.personalstats,
+                  timestamp,
+                ),
+              },
+            ])
+          }
           return Response.json(
             { point },
             { headers: { 'Cache-Control': 'no-store' } },

@@ -1,9 +1,9 @@
-import { and, eq, gte, inArray } from 'drizzle-orm'
+import { and, eq, gte, inArray, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { sharedStatSnapshots, statSharing } from '#/db/schema'
 import { fetchTorn } from '#/lib/torn/torn-api.server'
 import { dayEnd } from './my-stats'
-import type { StatPoint } from './my-stats'
+import type { ObservedStatPoint } from './my-stats'
 
 export type PlayerIdentity = {
   id: string
@@ -76,8 +76,12 @@ export const statSharingRepository = {
       await tx.delete(statSharing).where(eq(statSharing.playerId, playerId))
     })
   },
-  /** Saves readings only if the player is still sharing, and refreshes their faction. */
-  async record(identity: PlayerIdentity, points: StatPoint[]) {
+  /**
+   * Saves readings only if the player is still sharing, and refreshes their
+   * faction. Each point's timestamp is its day bucket; a reading replaces the
+   * stored one for that day only when it was observed at the same time or later.
+   */
+  async record(identity: PlayerIdentity, points: ObservedStatPoint[]) {
     if (points.length === 0) return
     await db.transaction(async (tx) => {
       const updated = await tx
@@ -101,6 +105,7 @@ export const statSharingRepository = {
               sharedStatSnapshots.timestamp,
             ],
             set: row,
+            setWhere: sql`${sharedStatSnapshots.observedAt} <= excluded.observed_at`,
           })
       }
     })
@@ -118,7 +123,15 @@ export const statSharingRepository = {
       )
     if (sharers.length === 0) return { sharers, snapshots: [] }
     const snapshots = await db
-      .select()
+      .select({
+        playerId: sharedStatSnapshots.playerId,
+        timestamp: sharedStatSnapshots.timestamp,
+        strength: sharedStatSnapshots.strength,
+        defense: sharedStatSnapshots.defense,
+        speed: sharedStatSnapshots.speed,
+        dexterity: sharedStatSnapshots.dexterity,
+        total: sharedStatSnapshots.total,
+      })
       .from(sharedStatSnapshots)
       .where(
         and(
@@ -140,7 +153,7 @@ export const statSharingRepository = {
  */
 export async function recordSharedStats(
   apiKey: string,
-  points: StatPoint[],
+  points: ObservedStatPoint[],
   identity?: PlayerIdentity,
 ) {
   if (!process.env.DATABASE_URL || points.length === 0) return
@@ -148,7 +161,11 @@ export async function recordSharedStats(
     const owner = identity ?? (await fetchPlayerIdentity(apiKey))
     await statSharingRepository.record(
       owner,
-      points.map((point) => ({ ...point, timestamp: dayEnd(point.timestamp) })),
+      points.map((point) => ({
+        ...point,
+        timestamp: dayEnd(point.timestamp),
+        observedAt: Math.floor(point.observedAt),
+      })),
     )
   } catch (error) {
     console.warn('[tornintel] Could not record shared stats', {

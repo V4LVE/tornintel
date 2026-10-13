@@ -95,7 +95,12 @@ export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
           })
           await recordSharedStats(
             apiKey,
-            [toStatPoint(data.battlestats, fetchedAt / 1000)],
+            [
+              {
+                ...toStatPoint(data.battlestats, fetchedAt / 1000),
+                observedAt: fetchedAt / 1000,
+              },
+            ],
             identity,
           )
           return Response.json({ isSharing: true }, { headers: noStore })

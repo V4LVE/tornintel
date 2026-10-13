@@ -46,11 +46,14 @@ export const statSharing = pgTable(
 )
 
 // Server-fetched battle stat readings for sharing players, one per UTC day.
+// `timestamp` is the end of the day; `observedAt` is when Torn observed the
+// values, so an older reading never replaces a newer one in the same day.
 export const sharedStatSnapshots = pgTable(
   'shared_stat_snapshots',
   {
     playerId: text('player_id').notNull(),
     timestamp: integer().notNull(),
+    observedAt: integer('observed_at').notNull().default(0),
     strength: doublePrecision().notNull(),
     defense: doublePrecision().notNull(),
     speed: doublePrecision().notNull(),

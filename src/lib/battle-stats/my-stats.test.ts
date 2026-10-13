@@ -4,6 +4,7 @@ import {
   describeBuild,
   effectiveValue,
   parsePersonalStats,
+  personalStatsObservedAt,
   sampleTimestamps,
 } from './my-stats'
 import type { StatPoint } from './my-stats'
@@ -73,6 +74,25 @@ test('derives the total and rejects incomplete readings', () => {
   assert.equal(parsePersonalStats(stats, 1)?.total, 20)
   assert.equal(parsePersonalStats(stats.slice(1), 1), null)
   assert.equal(parsePersonalStats(undefined, 1), null)
+})
+
+test('uses the latest Torn observation time, capped at the requested time', () => {
+  const stats = (timestamps: (number | undefined)[]) =>
+    ['strength', 'defense', 'speed', 'dexterity'].map((name, index) => ({
+      name,
+      value: 5,
+      timestamp: timestamps[index],
+    }))
+  assert.equal(personalStatsObservedAt(stats([100, 300, 200, 100]), 1000), 300)
+  assert.equal(personalStatsObservedAt(stats([100, 5000]), 1000), 1000)
+  assert.equal(personalStatsObservedAt(stats([]), 1000.7), 1000)
+  assert.equal(
+    personalStatsObservedAt(
+      [...stats([100]), { name: 'xantaken', value: 1, timestamp: 900 }],
+      1000,
+    ),
+    100,
+  )
 })
 
 test('applies modifiers to effective values', () => {

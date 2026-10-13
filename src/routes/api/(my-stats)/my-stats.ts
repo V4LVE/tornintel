@@ -44,7 +44,10 @@ export const Route = createFileRoute('/api/(my-stats)/my-stats')({
           }
 
           await recordSharedStats(apiKey, [
-            toStatPoint(battlestats, fetchedAt / 1000),
+            {
+              ...toStatPoint(battlestats, fetchedAt / 1000),
+              observedAt: fetchedAt / 1000,
+            },
           ])
           return Response.json(
             {

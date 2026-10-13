@@ -24,7 +24,7 @@ npm run build            # production build (.output/); also regenerates src/rou
 npm test                 # tsx --test "src/**/*.test.ts"
 npm run lint             # eslint
 npx tsc --noEmit
-npx prettier --check --end-of-line auto src README.md
+npx prettier --check src README.md
 npm run db:generate      # new migration after changing src/db/schema.ts
 npm run db:migrate       # run migrations against DATABASE_URL
 ```
@@ -40,7 +40,9 @@ npm run db:migrate       # run migrations against DATABASE_URL
 - Do not use `npx tsr generate`: it drops the `@tanstack/react-start` registration from the route tree, breaking types in every API route. Regenerate with `npx vite build`. Never edit `routeTree.gen.ts` by hand.
 - `npm ci` and builds can rewrite `package-lock.json`. Restore it with `git checkout -- package-lock.json` unless dependencies changed on purpose.
 - Known noise that predates current work: `npx tsc --noEmit` reports 10 drizzle-orm type errors and eslint reports 2 errors in `src/lib/travel.integration.test.ts`. Any other errors are yours.
-- The working copy uses CRLF (autocrlf). Pass `--end-of-line auto` when checking with prettier.
+- The working copy uses CRLF (autocrlf) and the index stores LF (`.gitattributes`). `prettier.config.js` sets `endOfLine: 'auto'` so prettier keeps each file's line endings.
+- Format only the files you changed (`npx prettier --write <files>`). Never `npm run format` or `prettier --write .`: it touches the whole repo. Before finishing, check `git diff --stat` and revert line-ending-only or whitespace-only changes to unrelated files.
+- When moving types or functions between files, let the compiler find the references: move, run `npx tsc --noEmit`, fix every new error, repeat. Text-replacement scripts miss references inside function bodies.
 - CI (`.github/workflows/coolify-deploy.yml`) runs neither lint nor tests. It only builds a Docker image for ghcr.io and calls the Coolify webhook on push to `main`. Run checks locally.
 
 ## Architecture
@@ -162,8 +164,9 @@ Everything must work without `DATABASE_URL`. Each storage feature checks `proces
 - **localStorage keys** use the `tornintel.` prefix: `apiKey`, `ffscouterKey`, `ffscouter`, `manualFactionId`, `hospitalPaused`, `paidPayouts`, `theme`. Store only per-viewer conveniences there, not shared state.
 - **API routes:**
   - Shape: `createFileRoute('/api/x')({ server: { handlers: { GET } } })`, with helpers below `Route` in the same file. Export nothing but `Route` from a route file; shared helpers belong in `src/lib`.
-  - Errors always use `Response.json({ error: 'Full sentence.' }, { status })`: 401 missing key, 400 validation, 404/409 for lookups, 502 for Torn or FF Scouter failures (pass `TornApiError.message` through), 503 without storage.
+  - Errors always use `Response.json({ error: 'Full sentence.' }, { status })`: 401 missing key, 400 validation, 403 not allowed, 404/409 for lookups, 502 for Torn or FF Scouter failures (pass `TornApiError.message` through), 503 without storage.
   - Set `Cache-Control: no-store`.
+  - **Authorization:** a valid Torn key proves who the caller is, not what they may change. Every write to data shared between users (a POST/PUT/PATCH/DELETE handler, or a `.server.ts` write reached from a GET) needs an explicit permission check, such as `isLevellingEditor`, and undoing someone else's change counts as a write. Each rule gets a test that asserts 403 for an unauthorized caller. When porting a feature, first list every mutation and who may perform it.
 - **Logging:** `console.warn/error('[tornintel] Message', { message })`, never with keys.
 - **Server and client:** `.server.ts` files are server-only (db, Torn fetches, node:crypto). Pure logic shared with the client goes in a sibling file without `.server`; types go in `src/models/`. The client may only `import type` from `.server` files.
 - **TypeScript:**
@@ -189,6 +192,17 @@ Everything must work without `DATABASE_URL`. Each storage feature checks `proces
   - Breakpoints are 1000px, 800px and 700px.
 - **Torn links:** `https://www.torn.com/page.php?sid=attack&user2ID=<id>` and `https://www.torn.com/profiles.php?XID=<id>`.
 - Update `README.md` when features, environment variables or flows change.
+- **Git:**
+  - Branch off for each piece of work; `main` deploys on push, so never commit to it directly.
+  - Commit subjects are past tense and capitalized, with no prefix and at most 72 characters ("Moved shared types and DTOs into src/models"), then short bullets for what and why.
+  - Answer a request for a commit message right away, even in the middle of other work.
+  - Commit at logical checkpoints instead of piling several features into one diff.
+
+## Claude Code setup (`.claude/`)
+
+- `settings.json`: a PostToolUse hook (`hooks/format-edited-file.mjs`) runs prettier on each file after Edit or Write. It skips `routeTree.gen.ts`, `drizzle/` and files in `.prettierignore`. Personal settings go in `settings.local.json`, which is git-ignored.
+- Skills: `/commit` (commit message in the repo style), `/pr-ready` (checks, authorization audit, PR description), `/merge-main` (merge `origin/main` or a parent branch into the current branch and resolve conflicts), `/handoff` (handoff document for a fresh session, saved in the OS temp directory), `/pr-review [n] [--deep]` (author-side review of your own GitHub PR, posted as one `COMMENT` review; needs `gh auth login`) and `/pr-fix [n]` (on your own PR: resolve conflicts with the base, then fix, answer or escalate every open review comment, push and reply).
+- Agents: `diff-reviewer` and `edge-case-explorer`, read-only reviewers that `/pr-review --deep` spawns.
 
 ## Domain knowledge
 

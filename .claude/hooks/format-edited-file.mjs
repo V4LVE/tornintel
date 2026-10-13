@@ -62,6 +62,8 @@ async function main() {
   if (info.ignored || !info.inferredParser) return
 
   const source = await readFile(absolute, 'utf8')
+  // Formatting a half-resolved merge rewrites the conflict markers into ordinary text.
+  if (/^(<{7}|={7}|>{7})( |$)/m.test(source)) return
   const options = (await prettier.resolveConfig(absolute)) ?? {}
   const formatted = await prettier.format(source, {
     ...options,

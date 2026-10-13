@@ -128,7 +128,7 @@ npx prettier --check --end-of-line auto <files touched by the resolution>
 npx vite build
 ```
 
-- Known noise: 10 drizzle-orm errors from tsc and 2 eslint errors in `src/lib/travel.integration.test.ts`. Anything else is the merge's fault and must be fixed before committing.
+- Known noise: the drizzle-orm errors from tsc and 2 eslint errors in `src/lib/travel/travel.integration.test.ts`. Anything else is the merge's fault and must be fixed before committing.
 - Prettier only on files you resolved. Never `npm run format` or `prettier --write .`.
 - After the build, check `git status`: keep a regenerated `src/routeTree.gen.ts` if routes changed; restore `package-lock.json` with `git checkout -- package-lock.json` unless dependencies changed on purpose.
 

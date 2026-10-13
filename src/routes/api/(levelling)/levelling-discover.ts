@@ -5,8 +5,8 @@ import {
   ffScouterKeyFrom,
 } from '#/lib/ffscouter/ffscouter.server'
 import { isLevellingTier, LEVELLING_TIERS } from '#/lib/levelling/levelling'
-import type { LevellingDiscoverResponse } from '#/lib/levelling/levelling'
 import { loadLevellingPlayers } from '#/lib/levelling/levelling.server'
+import type { LevellingDiscoverResponse } from '#/models/levelling'
 
 const headers = { 'Cache-Control': 'no-store' }
 

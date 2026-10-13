@@ -9,8 +9,8 @@ import {
   text,
   timestamp,
 } from 'drizzle-orm/pg-core'
-import type { FairFightObservation } from '../lib/battle-stats/estimator'
-import type { TravelSnapshot } from '../lib/travel/travel'
+import type { FairFightObservation } from '#/models/battle-stats'
+import type { TravelSnapshot } from '#/models/travel'
 
 export const factionMemberTravel = pgTable('faction_member_travel', {
   playerId: text('player_id').primaryKey(),

@@ -55,19 +55,20 @@ npm run db:migrate       # run migrations against DATABASE_URL
 | `/war-deals` | `war-deals.tsx` | War deal proposals for both outcomes (compensation = losing score × rate, whole items plus a cash remainder)                |
 | `/settings`  | `settings.tsx`  | Torn API key and optional FF Scouter key                                                                                    |
 
-`__root.tsx` holds the shell, favicon links, the theme boot script and `notFoundComponent`.
+`__root.tsx` holds the HTML document, favicon links, the theme boot script and `notFoundComponent`. Its `component` wraps every page in `SessionProvider` and `AppShell`, so pages render inside the shared sidebar and top bar and navigate client-side with `Link` (no full page loads, no back links).
 
 ### Folder structure
 
-Code is grouped by feature. Put new files in the matching feature folder, with tests next to them:
+Code is grouped by feature. Put new files in the matching feature folder, with tests next to them. Shared types and DTOs live in `src/models/`, one file per feature:
 
 ```
 src/
   components/            shared React components
   db/                    Drizzle client and schema
+  models/                shared types and DTOs, one file per feature (see Models below)
   lib/
     torn/                Torn API client (fetchTorn) and key verification
-    war-hospital/        enemy faction resolution, chain target types, dashboard route tests
+    war-hospital/        enemy faction resolution, dashboard route tests
     travel/              flight tracking
     battle-stats/        TBS estimator and Fair Fight evidence
     levelling/           tiers, bundled players.json, shared list changes
@@ -110,15 +111,36 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
 - **`levelling/`** (`levelling.ts`, `levelling.server.ts`): tiers (`LEVELLING_TIERS`, `tierForLevel`), normalizing `src/lib/levelling/players.json`, and `applyListChanges`.
 - **`ffscouter/`** (`ffscouter.ts`, `ffscouter.server.ts`): FF Scouter client. Estimates are cached for 5 minutes per key, because fair fight is relative to the key owner. `ffScouterKeyFrom(request)` uses `X-FfScouter-Key` and falls back to the Torn key.
 - **`war-deals/`**: war deal summaries, message generation and Torn data loading.
-- **`war-hospital/`**: `enemy-faction.server.ts` and `chain-target.ts` (response types for the keep-alive target).
+- **`war-hospital/`**: `enemy-faction.server.ts` (picks the opponent faction).
 - **`hooks/use-visible-polling.ts`**: polling without overlapping requests, only while the tab is visible.
 - **`hooks/use-table-view.ts`** and **`table-view/`**: client-side search, filter tabs, column sorting and pagination. Missing sort values always go last; the page is clamped so polling refreshes keep the current page.
+
+### Models (`src/models/`)
+
+Every shared type and DTO, so the API route and the page use the same definition. Files hold only `type` declarations (no runtime code) and import each other with `import type`:
+
+| File              | Contents                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `account.ts`      | `UserProfile` and the `/api/user` response                                                              |
+| `battle-stats.ts` | Battle stats, Fair Fight observations, `BattleStatsEstimate`, shared evidence and contributors          |
+| `ffscouter.ts`    | FF Scouter API shapes, `FfScouterEstimate`, key status                                                  |
+| `levelling.ts`    | `LevellingTier`, list players and changes, `/api/levelling-*` responses                                 |
+| `payouts.ts`      | Payout players, wars and `/api/payout-hits` responses                                                   |
+| `torn.ts`         | Raw Torn API responses as tornintel reads them (`TornAttack`, `TornBasicProfile`, `TornRankedWar`, ...) |
+| `travel.ts`       | Member status, travel snapshots and estimates                                                           |
+| `war-deals.ts`    | `CacheEstimate`, `DealDefaults`                                                                         |
+| `war-hospital.ts` | `WarTarget`, `FactionMembersResponse`, `CombatBarsResponse`, chain target and enemy faction types       |
+
+- Put a type here when more than one file uses it, when it is an API response (DTO), or when it describes a Torn or FF Scouter response. Props and small helper types used by a single file stay in that file.
+- API routes check their responses with `satisfies <Response type>` from here, and pages fetch with the same type, so a changed DTO fails type checking on both sides.
 
 ### Components (`src/components/`)
 
 - `battle-stats-cell.tsx`: TBS display, shared by the dashboard and levelling.
 - `table-controls.tsx`: `TableToolbar` (filter tabs with counts and search), `SortHeader`, `TableEmpty` and `TablePagination`. Driven by `useTableView` from `src/lib/hooks/use-table-view.ts` (pure helpers in `src/lib/table-view/`). Every list table uses them inside a `.panel` (`.panel.table-panel` on standalone pages); new lists should too instead of building their own filtering or paging.
 - `theme-toggle.tsx`: the dark/light button and `themeBootScript`.
+- `session.tsx`: `SessionProvider` and `useSession()`: the verified Torn key and profile (`apiKey`, `user`, `connect`, `disconnect`). Pages read the key from here instead of verifying it themselves.
+- `app-shell.tsx`: `AppShell` (API key gate, sidebar, top bar with breadcrumb) and `PageHeading` (eyebrow, title, description) for the top of each page. The sidebar is configured in `NAV_SECTIONS`: **Faction** for faction-wide tools and **Personal** for the viewer's own tools. A new page gets a nav entry there and starts with `PageHeading`; items without a `link` show as "Soon".
 
 ### Database (`src/db/schema.ts`, migrations in `drizzle/`)
 
@@ -143,7 +165,7 @@ Everything must work without `DATABASE_URL`. Each storage feature checks `proces
   - Errors always use `Response.json({ error: 'Full sentence.' }, { status })`: 401 missing key, 400 validation, 404/409 for lookups, 502 for Torn or FF Scouter failures (pass `TornApiError.message` through), 503 without storage.
   - Set `Cache-Control: no-store`.
 - **Logging:** `console.warn/error('[tornintel] Message', { message })`, never with keys.
-- **Server and client:** `.server.ts` files are server-only (db, Torn fetches, node:crypto). Shared types and pure logic go in a sibling file without `.server`. The client may only `import type` from `.server` files.
+- **Server and client:** `.server.ts` files are server-only (db, Torn fetches, node:crypto). Pure logic shared with the client goes in a sibling file without `.server`; types go in `src/models/`. The client may only `import type` from `.server` files.
 - **TypeScript:**
   - Use `type`, not `interface`.
   - Put type imports on a separate `import type` line (enforced by `consistent-type-imports` and `verbatimModuleSyntax`).

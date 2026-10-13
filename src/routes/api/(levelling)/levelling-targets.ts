@@ -1,8 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type {
-  LevellingTarget,
-  LevellingTargetsResponse,
-} from '#/lib/levelling/levelling'
 import {
   isLevellingTier,
   playersInTier,
@@ -10,13 +6,11 @@ import {
 } from '#/lib/levelling/levelling'
 import { loadLevellingPlayers } from '#/lib/levelling/levelling.server'
 import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
-
-type BasicProfile = {
-  player_id?: number
-  name?: string
-  level?: number
-  status?: { state?: string; description?: string }
-}
+import type {
+  LevellingTarget,
+  LevellingTargetsResponse,
+} from '#/models/levelling'
+import type { TornBasicProfile } from '#/models/torn'
 
 const TARGET_COUNT = 3
 const MAX_PROFILE_CHECKS = 12
@@ -139,12 +133,12 @@ async function loadBasic(apiKey: string, id: number, signal: AbortSignal) {
   url.searchParams.set('selections', 'basic')
   url.searchParams.set('key', apiKey)
   try {
-    const { data } = await fetchTorn<BasicProfile>(url, {
+    const { data } = await fetchTorn<TornBasicProfile>(url, {
       maxAgeMs: 60000,
       signal,
       // Unavailable players stay cached briefly; available ones are always rechecked.
       cacheWhen: (profile) =>
-        (profile as BasicProfile).status?.state !== 'Okay',
+        (profile as TornBasicProfile).status?.state !== 'Okay',
     })
     return data
   } catch (error) {

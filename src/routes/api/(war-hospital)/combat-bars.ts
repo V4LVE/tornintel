@@ -1,26 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
-
-type TornBar = {
-  current: number
-  maximum: number
-  increment: number
-  interval: number
-  tick_time: number
-  full_time: number
-}
-
-type TornChain = {
-  current: number
-  max: number
-  timeout: number
-  cooldown: number
-}
-
-type TornBarsResponse = {
-  bars?: { energy?: TornBar; chain?: TornChain | null }
-  error?: { code: number; error: string }
-}
+import type { TornBarsResponse } from '#/models/torn'
+import type { CombatBarsResponse } from '#/models/war-hospital'
 
 export const Route = createFileRoute('/api/(war-hospital)/combat-bars')({
   server: {
@@ -63,7 +44,7 @@ export const Route = createFileRoute('/api/(war-hospital)/combat-bars')({
               energy,
               chain: payload.bars?.chain ?? null,
               fetchedAt,
-            },
+            } satisfies CombatBarsResponse,
             { headers: { 'Cache-Control': 'no-store' } },
           )
         } catch (error) {

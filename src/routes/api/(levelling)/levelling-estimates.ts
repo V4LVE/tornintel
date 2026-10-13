@@ -4,7 +4,7 @@ import {
   ffScouterErrorResponse,
   ffScouterKeyFrom,
 } from '#/lib/ffscouter/ffscouter.server'
-import type { LevellingEstimatesResponse } from '#/lib/levelling/levelling'
+import type { LevellingEstimatesResponse } from '#/models/levelling'
 
 const headers = { 'Cache-Control': 'no-store' }
 // Enough for the largest tier, including players added in tornintel.

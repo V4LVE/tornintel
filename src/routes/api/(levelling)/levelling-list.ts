@@ -1,21 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { ffScouter, ffScouterKeyFrom } from '#/lib/ffscouter/ffscouter.server'
 import { LEVELLING_TIERS } from '#/lib/levelling/levelling'
-import type { LevellingListResponse } from '#/lib/levelling/levelling'
 import {
   isLevellingEditor,
   levellingListRepository,
   loadLevellingPlayers,
 } from '#/lib/levelling/levelling.server'
 import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
-
-type BasicProfile = {
-  player_id?: number
-  name?: string
-  level?: number
-}
-
-type EditorProfile = BasicProfile & { faction?: { faction_id?: number } }
+import type { LevellingListResponse } from '#/models/levelling'
+import type { TornBasicProfile } from '#/models/torn'
 
 const headers = { 'Cache-Control': 'no-store' }
 const MIN_LEVEL = Math.min(
@@ -195,7 +188,7 @@ async function loadEditor(apiKey: string) {
   const url = new URL('https://api.torn.com/user/')
   url.searchParams.set('selections', 'profile')
   url.searchParams.set('key', apiKey)
-  const { data } = await fetchTorn<EditorProfile>(url, { maxAgeMs: 60000 })
+  const { data } = await fetchTorn<TornBasicProfile>(url, { maxAgeMs: 60000 })
   if (!data.player_id || !data.name) {
     throw new Error('Torn returned an incomplete profile.')
   }
@@ -212,7 +205,7 @@ async function loadBasic(apiKey: string, id: number) {
   url.searchParams.set('selections', 'basic')
   url.searchParams.set('key', apiKey)
   try {
-    const { data } = await fetchTorn<BasicProfile>(url, { maxAgeMs: 60000 })
+    const { data } = await fetchTorn<TornBasicProfile>(url, { maxAgeMs: 60000 })
     return data
   } catch (error) {
     // Torn reports an unknown player ID as code 6; treat it as not found.

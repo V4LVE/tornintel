@@ -1,16 +1,6 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import type {
-  DiscoveredPlayer,
-  FfScouterEstimate,
-  LevellingDiscoverResponse,
-  LevellingEstimatesResponse,
-  LevellingListResponse,
-  LevellingStatsResponse,
-  LevellingPlayer,
-  LevellingTargetsResponse,
-  LevellingTier,
-} from '#/lib/levelling/levelling'
+import { PageHeading } from '#/components/app-shell'
 import {
   BattleStatsCell,
   battleStatsSortValue,
@@ -29,6 +19,17 @@ import {
   playersInTier,
   tierForLevel,
 } from '#/lib/levelling/levelling'
+import type { FfScouterEstimate } from '#/models/ffscouter'
+import type {
+  DiscoveredPlayer,
+  LevellingDiscoverResponse,
+  LevellingEstimatesResponse,
+  LevellingListResponse,
+  LevellingPlayer,
+  LevellingStatsResponse,
+  LevellingTargetsResponse,
+  LevellingTier,
+} from '#/models/levelling'
 
 export const Route = createFileRoute('/levelling')({ component: Levelling })
 
@@ -201,16 +202,12 @@ function Levelling() {
   }
 
   return (
-    <main className="payout-page levelling-page">
-      <a href="/" className="back-link">
-        ← War hospital
-      </a>
-      <h1>Levelling targets</h1>
-      <p>
+    <section className="payout-page levelling-page">
+      <PageHeading eyebrow="PERSONAL" title="Levelling targets">
         Low-stat players for levelling, grouped in tiers of ten levels. Pick a
         tier and get three random targets that Torn confirms are out of
         hospital, jail and travel.
-      </p>
+      </PageHeading>
 
       <div className="levelling-tiers" role="tablist">
         {TIERS.map((key) => {
@@ -247,8 +244,8 @@ function Levelling() {
         </button>
       ) : (
         <p className="levelling-note">
-          <a href="/settings">Connect a Torn API key</a> to check which players
-          can be attacked right now. The full list is shown below.
+          <Link to="/settings">Connect a Torn API key</Link> to check which
+          players can be attacked right now. The full list is shown below.
         </p>
       )}
       {error && <p className="settings-error levelling-error">{error}</p>}
@@ -346,9 +343,9 @@ function Levelling() {
               ffscouter.com
             </a>{' '}
             and must be registered there.{' '}
-            <a href="/settings">
+            <Link to="/settings">
               {ffScouterKey ? 'Change' : 'Use a separate'} FF Scouter key
-            </a>
+            </Link>
           </p>
           {ffScouterActive && estimatesError && (
             <p className="settings-error levelling-error">{estimatesError}</p>
@@ -446,7 +443,7 @@ function Levelling() {
         <TableEmpty view={listView} noun="players" />
         <TablePagination view={listView} noun="players" />
       </section>
-    </main>
+    </section>
   )
 }
 

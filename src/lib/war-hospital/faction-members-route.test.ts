@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Route } from '../../routes/api/(war-hospital)/faction-members'
 import { sharedEvidenceRepository } from '../battle-stats/shared-evidence.server'
-import type { SharedObservation } from '../battle-stats/shared-evidence.server'
 import { travelTrackingRepository } from '../travel/travel.server'
 import { observeTravel } from '../travel/travel'
-import type { MemberStatus, TravelSnapshot } from '../travel/travel'
+import type { SharedObservation } from '#/models/battle-stats'
+import type { MemberStatus, TravelSnapshot } from '#/models/travel'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function') {

@@ -1,9 +1,4 @@
-export type CacheEstimate = {
-  name: string
-  ours: number
-  theirs: number
-  price: number
-}
+import type { CacheEstimate } from '#/models/war-deals'
 
 export function summarizeDeal(
   ourScore: number,

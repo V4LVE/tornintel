@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { PageHeading } from '#/components/app-shell'
 import {
   SortHeader,
   TableEmpty,
@@ -7,15 +8,18 @@ import {
   TableToolbar,
 } from '#/components/table-controls'
 import { useTableView } from '#/lib/hooks/use-table-view'
+import type {
+  PayoutPlayer,
+  PayoutPlayersResponse,
+  PayoutWar,
+  PayoutWarsResponse,
+} from '#/models/payouts'
 
 export const Route = createFileRoute('/payouts')({ component: Payouts })
 
-type Player = { id: string; name: string; warHits: number; nonWarHits: number }
-type War = { id: number; start: number; end: number }
-
 function Payouts() {
-  const [players, setPlayers] = useState<Player[]>([])
-  const [wars, setWars] = useState<War[]>([])
+  const [players, setPlayers] = useState<PayoutPlayer[]>([])
+  const [wars, setWars] = useState<PayoutWar[]>([])
   const [warId, setWarId] = useState('')
   const [includeNonWar, setIncludeNonWar] = useState(true)
   const [earnings, setEarnings] = useState(0)
@@ -28,13 +32,13 @@ function Payouts() {
     const controller = new AbortController()
     async function loadWars() {
       try {
-        const data = await fetchPayoutData<{ wars?: War[] }>(
+        const data = await fetchPayoutData<PayoutWarsResponse>(
           '/api/payout-hits',
           key,
           controller.signal,
         )
-        setWars(data.wars ?? [])
-        setWarId((current) => current || String(data.wars?.[0]?.id ?? ''))
+        setWars(data.wars)
+        setWarId((current) => current || String(data.wars[0]?.id ?? ''))
       } catch (requestError) {
         if (!controller.signal.aborted) setError(errorMessage(requestError))
       }
@@ -49,13 +53,13 @@ function Payouts() {
     const controller = new AbortController()
     async function loadPlayers() {
       try {
-        const data = await fetchPayoutData<{ players?: Player[] }>(
+        const data = await fetchPayoutData<PayoutPlayersResponse>(
           `/api/payout-hits?warId=${encodeURIComponent(warId.trim())}`,
           key,
           controller.signal,
         )
         setError('')
-        setPlayers(data.players ?? [])
+        setPlayers(data.players)
       } catch (requestError) {
         if (!controller.signal.aborted) setError(errorMessage(requestError))
       }
@@ -115,15 +119,11 @@ function Payouts() {
     localStorage.setItem('tornintel.paidPayouts', JSON.stringify(next))
   }
   return (
-    <main className="payout-page">
-      <a href="/" className="back-link">
-        ← War hospital
-      </a>
-      <h1>War payout</h1>
-      <p>
+    <section className="payout-page">
+      <PageHeading eyebrow="RANKED WAR" title="War payout">
         Select a ranked war. Non-war hits are attacks during that war against
         targets outside the opposing faction.
-      </p>
+      </PageHeading>
       <div className="payout-inputs">
         <label>
           Ranked war
@@ -238,7 +238,7 @@ function Payouts() {
           <TablePagination view={payoutView} noun="players" />
         </section>
       )}
-    </main>
+    </section>
   )
 }
 function money(value: number) {

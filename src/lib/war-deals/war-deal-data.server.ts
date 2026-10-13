@@ -1,29 +1,11 @@
 import { fetchTorn } from '../torn/torn-api.server'
-import type { DealDefaults } from './war-deal-data'
-
-type Faction = { id: number; name: string }
-type RankedWar = {
-  id: number
-  end: number
-  start: number
-  target: number
-  factions: Faction[]
-}
-type Item = { id: number; name: string; value: { market_price: number } }
-type Report = {
-  rankedwarreport: {
-    id: number
-    end: number
-    winner: number
-    factions: Array<
-      Faction & {
-        rewards: {
-          items: Array<{ id: number; name: string; quantity: number }>
-        }
-      }
-    >
-  }
-}
+import type {
+  TornFaction,
+  TornItem,
+  TornRankedWar,
+  TornRankedWarReport,
+} from '#/models/torn'
+import type { DealDefaults } from '#/models/war-deals'
 
 export async function loadDealDefaults(
   key: string,
@@ -35,7 +17,7 @@ export async function loadDealDefaults(
     const { data } = await fetchTorn<T>(url, { maxAgeMs })
     return data
   }
-  const { basic } = await get<{ basic?: Faction }>('/faction/basic')
+  const { basic } = await get<{ basic?: TornFaction }>('/faction/basic')
   if (!basic?.id || !basic.name)
     throw new Error('Could not identify your faction.')
   const warnings: string[] = []
@@ -61,14 +43,14 @@ export async function loadDealDefaults(
             war_id: number
             target: number
             start: number
-            factions: Faction[]
+            factions: TornFaction[]
           } | null
         }
       }>('/faction/wars'),
     ),
     optional(
       'Item prices unavailable',
-      get<{ items: Item[] }>('/torn/items', 300000),
+      get<{ items: TornItem[] }>('/torn/items', 300000),
     ),
   ])
   const current = wars?.wars.ranked
@@ -79,7 +61,7 @@ export async function loadDealDefaults(
       throw new Error('The opponent must be a different faction.')
     const other = await optional(
       'Opponent unavailable',
-      get<{ basic: Faction }>(`/faction/${opponentId}/basic`),
+      get<{ basic: TornFaction }>(`/faction/${opponentId}/basic`),
     )
     opponent = other?.basic ?? null
   }
@@ -111,7 +93,7 @@ export async function loadDealDefaults(
       if (!faction) return
       const history = await optional(
         `${faction.name} reward history unavailable`,
-        get<{ rankedwars: RankedWar[] }>(
+        get<{ rankedwars: TornRankedWar[] }>(
           `/faction/${faction.id}/rankedwars?limit=5&sort=DESC`,
         ),
       )
@@ -126,7 +108,10 @@ export async function loadDealDefaults(
       }
       const report = await optional(
         `${faction.name} reward report unavailable`,
-        get<Report>(`/faction/${latest.id}/rankedwarreport`, 300000),
+        get<TornRankedWarReport>(
+          `/faction/${latest.id}/rankedwarreport`,
+          300000,
+        ),
       )
       const rewards = report?.rankedwarreport.factions.find(
         (side) => side.id === faction.id,

@@ -1,17 +1,11 @@
 import { inArray, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { sharedFairFightObservations } from '#/db/schema'
-import type { FairFightObservation } from './estimator'
-
-export type SharedObservation = {
-  evidenceId: string
-  playerId: string
-  sourcePlayerId: string
-  sourcePlayerName?: string | null
-  observation: FairFightObservation
-}
-
-export type BattleStatContributor = { id: string; name: string | null }
+import type {
+  BattleStatContributor,
+  FairFightObservation,
+  SharedObservation,
+} from '#/models/battle-stats'
 
 // Save only server-fetched combat evidence, never client-supplied estimates or keys.
 export const sharedEvidenceRepository = {

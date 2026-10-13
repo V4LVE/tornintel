@@ -10,13 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MyStatsRouteImport } from './routes/my-stats'
 import { Route as PayoutsRouteImport } from './routes/payouts'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WarDealsRouteImport } from './routes/war-deals'
 import { Route as ApiChainTargetRouteImport } from './routes/api/chain-target'
 import { Route as ApiCombatBarsRouteImport } from './routes/api/combat-bars'
 import { Route as ApiFactionMembersRouteImport } from './routes/api/faction-members'
+import { Route as ApiFactionStatsRouteImport } from './routes/api/faction-stats'
+import { Route as ApiMyStatsRouteImport } from './routes/api/my-stats'
+import { Route as ApiMyStatsHistoryRouteImport } from './routes/api/my-stats-history'
 import { Route as ApiPayoutHitsRouteImport } from './routes/api/payout-hits'
+import { Route as ApiStatSharingRouteImport } from './routes/api/stat-sharing'
 import { Route as ApiUserRouteImport } from './routes/api/user'
 import { Route as ApiWarDealDefaultsRouteImport } from './routes/api/war-deal-defaults'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -24,6 +29,11 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyStatsRoute = MyStatsRouteImport.update({
+  id: '/my-stats',
+  path: '/my-stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayoutsRoute = PayoutsRouteImport.update({
@@ -56,9 +66,29 @@ const ApiFactionMembersRoute = ApiFactionMembersRouteImport.update({
   path: '/api/faction-members',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFactionStatsRoute = ApiFactionStatsRouteImport.update({
+  id: '/api/faction-stats',
+  path: '/api/faction-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMyStatsRoute = ApiMyStatsRouteImport.update({
+  id: '/api/my-stats',
+  path: '/api/my-stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMyStatsHistoryRoute = ApiMyStatsHistoryRouteImport.update({
+  id: '/api/my-stats-history',
+  path: '/api/my-stats-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPayoutHitsRoute = ApiPayoutHitsRouteImport.update({
   id: '/api/payout-hits',
   path: '/api/payout-hits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatSharingRoute = ApiStatSharingRouteImport.update({
+  id: '/api/stat-sharing',
+  path: '/api/stat-sharing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUserRoute = ApiUserRouteImport.update({
@@ -79,26 +109,36 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/my-stats': typeof MyStatsRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
   '/api/chain-target': typeof ApiChainTargetRoute
   '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
+  '/api/faction-stats': typeof ApiFactionStatsRoute
+  '/api/my-stats': typeof ApiMyStatsRoute
+  '/api/my-stats-history': typeof ApiMyStatsHistoryRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
+  '/api/stat-sharing': typeof ApiStatSharingRoute
   '/api/user': typeof ApiUserRoute
   '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/my-stats': typeof MyStatsRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
   '/api/chain-target': typeof ApiChainTargetRoute
   '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
+  '/api/faction-stats': typeof ApiFactionStatsRoute
+  '/api/my-stats': typeof ApiMyStatsRoute
+  '/api/my-stats-history': typeof ApiMyStatsHistoryRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
+  '/api/stat-sharing': typeof ApiStatSharingRoute
   '/api/user': typeof ApiUserRoute
   '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -106,13 +146,18 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/my-stats': typeof MyStatsRoute
   '/payouts': typeof PayoutsRoute
   '/settings': typeof SettingsRoute
   '/war-deals': typeof WarDealsRoute
   '/api/chain-target': typeof ApiChainTargetRoute
   '/api/combat-bars': typeof ApiCombatBarsRoute
   '/api/faction-members': typeof ApiFactionMembersRoute
+  '/api/faction-stats': typeof ApiFactionStatsRoute
+  '/api/my-stats': typeof ApiMyStatsRoute
+  '/api/my-stats-history': typeof ApiMyStatsHistoryRoute
   '/api/payout-hits': typeof ApiPayoutHitsRoute
+  '/api/stat-sharing': typeof ApiStatSharingRoute
   '/api/user': typeof ApiUserRoute
   '/api/war-deal-defaults': typeof ApiWarDealDefaultsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -121,39 +166,54 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/my-stats'
     | '/payouts'
     | '/settings'
     | '/war-deals'
     | '/api/chain-target'
     | '/api/combat-bars'
     | '/api/faction-members'
+    | '/api/faction-stats'
+    | '/api/my-stats'
+    | '/api/my-stats-history'
     | '/api/payout-hits'
+    | '/api/stat-sharing'
     | '/api/user'
     | '/api/war-deal-defaults'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/my-stats'
     | '/payouts'
     | '/settings'
     | '/war-deals'
     | '/api/chain-target'
     | '/api/combat-bars'
     | '/api/faction-members'
+    | '/api/faction-stats'
+    | '/api/my-stats'
+    | '/api/my-stats-history'
     | '/api/payout-hits'
+    | '/api/stat-sharing'
     | '/api/user'
     | '/api/war-deal-defaults'
     | '/api/auth/$'
   id:
     | '__root__'
     | '/'
+    | '/my-stats'
     | '/payouts'
     | '/settings'
     | '/war-deals'
     | '/api/chain-target'
     | '/api/combat-bars'
     | '/api/faction-members'
+    | '/api/faction-stats'
+    | '/api/my-stats'
+    | '/api/my-stats-history'
     | '/api/payout-hits'
+    | '/api/stat-sharing'
     | '/api/user'
     | '/api/war-deal-defaults'
     | '/api/auth/$'
@@ -161,13 +221,18 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MyStatsRoute: typeof MyStatsRoute
   PayoutsRoute: typeof PayoutsRoute
   SettingsRoute: typeof SettingsRoute
   WarDealsRoute: typeof WarDealsRoute
   ApiChainTargetRoute: typeof ApiChainTargetRoute
   ApiCombatBarsRoute: typeof ApiCombatBarsRoute
   ApiFactionMembersRoute: typeof ApiFactionMembersRoute
+  ApiFactionStatsRoute: typeof ApiFactionStatsRoute
+  ApiMyStatsRoute: typeof ApiMyStatsRoute
+  ApiMyStatsHistoryRoute: typeof ApiMyStatsHistoryRoute
   ApiPayoutHitsRoute: typeof ApiPayoutHitsRoute
+  ApiStatSharingRoute: typeof ApiStatSharingRoute
   ApiUserRoute: typeof ApiUserRoute
   ApiWarDealDefaultsRoute: typeof ApiWarDealDefaultsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -180,6 +245,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-stats': {
+      id: '/my-stats'
+      path: '/my-stats'
+      fullPath: '/my-stats'
+      preLoaderRoute: typeof MyStatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payouts': {
@@ -224,11 +296,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFactionMembersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/faction-stats': {
+      id: '/api/faction-stats'
+      path: '/api/faction-stats'
+      fullPath: '/api/faction-stats'
+      preLoaderRoute: typeof ApiFactionStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/my-stats': {
+      id: '/api/my-stats'
+      path: '/api/my-stats'
+      fullPath: '/api/my-stats'
+      preLoaderRoute: typeof ApiMyStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/my-stats-history': {
+      id: '/api/my-stats-history'
+      path: '/api/my-stats-history'
+      fullPath: '/api/my-stats-history'
+      preLoaderRoute: typeof ApiMyStatsHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/payout-hits': {
       id: '/api/payout-hits'
       path: '/api/payout-hits'
       fullPath: '/api/payout-hits'
       preLoaderRoute: typeof ApiPayoutHitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stat-sharing': {
+      id: '/api/stat-sharing'
+      path: '/api/stat-sharing'
+      fullPath: '/api/stat-sharing'
+      preLoaderRoute: typeof ApiStatSharingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/user': {
@@ -257,13 +357,18 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MyStatsRoute: MyStatsRoute,
   PayoutsRoute: PayoutsRoute,
   SettingsRoute: SettingsRoute,
   WarDealsRoute: WarDealsRoute,
   ApiChainTargetRoute: ApiChainTargetRoute,
   ApiCombatBarsRoute: ApiCombatBarsRoute,
   ApiFactionMembersRoute: ApiFactionMembersRoute,
+  ApiFactionStatsRoute: ApiFactionStatsRoute,
+  ApiMyStatsRoute: ApiMyStatsRoute,
+  ApiMyStatsHistoryRoute: ApiMyStatsHistoryRoute,
   ApiPayoutHitsRoute: ApiPayoutHitsRoute,
+  ApiStatSharingRoute: ApiStatSharingRoute,
   ApiUserRoute: ApiUserRoute,
   ApiWarDealDefaultsRoute: ApiWarDealDefaultsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

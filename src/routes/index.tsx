@@ -9,7 +9,18 @@ import { verifyTornUser } from '#/lib/torn/torn-user'
 import type { UserProfile } from '#/lib/torn/torn-user'
 import type { ChainTargetResponse } from '#/lib/war-hospital/chain-target'
 import { useVisiblePolling } from '#/lib/hooks/use-visible-polling'
-import { BattleStatsCell } from '#/components/battle-stats-cell'
+import { useTableView } from '#/lib/hooks/use-table-view'
+import type { TableFilter } from '#/lib/hooks/use-table-view'
+import {
+  BattleStatsCell,
+  battleStatsSortValue,
+} from '#/components/battle-stats-cell'
+import {
+  SortHeader,
+  TableEmpty,
+  TablePagination,
+  TableToolbar,
+} from '#/components/table-controls'
 import { ThemeToggle } from '#/components/theme-toggle'
 
 const MANUAL_FACTION_KEY = 'tornintel.manualFactionId'
@@ -70,17 +81,23 @@ type CombatBarsResponse = {
   error?: string
 }
 
-const filters = [
-  'All targets',
-  'In hospital',
-  'Ready',
-  'Traveling',
-  'Abroad',
-] as const
+const TARGET_FILTERS: TableFilter<Target, string>[] = [
+  { id: 'all', label: 'All targets' },
+  ...(['In hospital', 'Ready', 'Traveling', 'Abroad'] as const).map(
+    (status) => ({
+      id: status,
+      label: status,
+      test: (target: Target) => target.status === status,
+    }),
+  ),
+]
+const PRIORITY_ORDER: Record<Target['priority'], number> = {
+  High: 0,
+  Medium: 1,
+  Low: 2,
+}
 
 function Home() {
-  const [filter, setFilter] = useState<(typeof filters)[number]>('All targets')
-  const [query, setQuery] = useState('')
   const [targets, setTargets] = useState<Target[]>([])
   const [fairFightStatus, setFairFightStatus] = useState<
     FactionMembersResponse['fairFightStatus'] | null
@@ -392,18 +409,25 @@ function Home() {
     )
   }
 
-  const visibleTargets = useMemo(
-    () =>
-      targets.filter((target) => {
-        const matchesFilter =
-          filter === 'All targets' || target.status === filter
-        const matchesQuery =
-          target.name.toLowerCase().includes(query.toLowerCase()) ||
-          target.id.includes(query)
-        return matchesFilter && matchesQuery
-      }),
-    [filter, query, targets],
-  )
+  const targetView = useTableView(targets, {
+    search: (target) => [target.name, target.id],
+    filters: TARGET_FILTERS,
+    sorts: {
+      member: (target) => target.name,
+      level: (target) => target.level,
+      // Time until the member can be hit: ready first, then hospital and landings.
+      release: (target) =>
+        target.status === 'Ready'
+          ? 0
+          : target.status === 'In hospital'
+            ? target.releaseAt
+            : target.status === 'Traveling'
+              ? target.travel?.latestArrivalAt
+              : null,
+      tbs: (target) => battleStatsSortValue(target.battleStats),
+      priority: (target) => PRIORITY_ORDER[target.priority],
+    },
+  })
 
   const hospitalTargets = useMemo(
     () =>
@@ -826,48 +850,33 @@ function Home() {
             targets.some((target) => target.status === 'Traveling') && (
               <p className="ff-evidence-note">{travelTrackingReason}</p>
             )}
-          <div className="toolbar">
-            <div className="filter-tabs">
-              {filters.map((item) => (
-                <button
-                  key={item}
-                  className={
-                    filter === item ? 'filter-tab selected' : 'filter-tab'
-                  }
-                  onClick={() => setFilter(item)}
-                >
-                  {item}
-                  {item === 'All targets' && <em>{targets.length}</em>}
-                </button>
-              ))}
-            </div>
-            <label className="search">
-              <span>&#9906;</span>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by name or ID"
-              />
-            </label>
-          </div>
+          <TableToolbar view={targetView} />
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>MEMBER</th>
+                  <SortHeader view={targetView} column="member">
+                    MEMBER
+                  </SortHeader>
                   <th>STATUS</th>
-                  <th>RELEASE / LANDING</th>
+                  <SortHeader view={targetView} column="release">
+                    RELEASE / LANDING
+                  </SortHeader>
                   <th>REASON</th>
                   <th>LAST SEEN</th>
-                  <th>EST. TBS</th>
-                  <th>PRIORITY</th>
+                  <SortHeader view={targetView} column="tbs">
+                    EST. TBS
+                  </SortHeader>
+                  <SortHeader view={targetView} column="priority">
+                    PRIORITY
+                  </SortHeader>
                   <th>
                     <span className="sr-only">Action</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {visibleTargets.map((target) => (
+                {targetView.pageItems.map((target) => (
                   <TargetRow key={target.id} target={target} clock={clock} />
                 ))}
               </tbody>
@@ -879,19 +888,12 @@ function Home() {
           {error && (
             <div className="empty-state">Could not load live data. {error}</div>
           )}
-          {!isLoading && !error && visibleTargets.length === 0 && (
-            <div className="empty-state">No members match this view.</div>
-          )}
-          <div className="panel-footer">
-            <span>
-              Showing {visibleTargets.length} of {targets.length} members
-            </span>
-            <span>
-              {isPaused
-                ? 'Hospital tracking paused'
-                : 'Refreshes every 30 seconds while this tab is visible'}
-            </span>
-          </div>
+          {!error && <TableEmpty view={targetView} noun="members" />}
+          <TablePagination view={targetView} noun="members">
+            {isPaused
+              ? 'Hospital tracking paused'
+              : 'Refreshes every 30 seconds while this tab is visible'}
+          </TablePagination>
         </section>
         <footer className="footer-note">
           <span className="shield">&#10003;</span> Data comes directly from Torn

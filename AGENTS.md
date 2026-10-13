@@ -74,7 +74,8 @@ src/
     ffscouter/           FF Scouter client
     war-deals/           war deal logic and data loading
     auth/                Better Auth scaffolding
-    hooks/               React hooks (use-visible-polling)
+    hooks/               React hooks (use-visible-polling, use-table-view)
+    table-view/          search, sort and pagination helpers for tables
   routes/                pages (file name = URL)
     api/(<feature>)/     API routes grouped per feature
 ```
@@ -111,10 +112,12 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
 - **`war-deals/`**: war deal summaries, message generation and Torn data loading.
 - **`war-hospital/`**: `enemy-faction.server.ts` and `chain-target.ts` (response types for the keep-alive target).
 - **`hooks/use-visible-polling.ts`**: polling without overlapping requests, only while the tab is visible.
+- **`hooks/use-table-view.ts`** and **`table-view/`**: client-side search, filter tabs, column sorting and pagination. Missing sort values always go last; the page is clamped so polling refreshes keep the current page.
 
 ### Components (`src/components/`)
 
 - `battle-stats-cell.tsx`: TBS display, shared by the dashboard and levelling.
+- `table-controls.tsx`: `TableToolbar` (filter tabs with counts and search), `SortHeader`, `TableEmpty` and `TablePagination`. Driven by `useTableView` from `src/lib/hooks/use-table-view.ts` (pure helpers in `src/lib/table-view/`). Every list table uses them inside a `.panel` (`.panel.table-panel` on standalone pages); new lists should too instead of building their own filtering or paging.
 - `theme-toggle.tsx`: the dark/light button and `themeBootScript`.
 
 ### Database (`src/db/schema.ts`, migrations in `drizzle/`)

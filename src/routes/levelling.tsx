@@ -11,7 +11,18 @@ import type {
   LevellingTargetsResponse,
   LevellingTier,
 } from '#/lib/levelling/levelling'
-import { BattleStatsCell } from '#/components/battle-stats-cell'
+import {
+  BattleStatsCell,
+  battleStatsSortValue,
+} from '#/components/battle-stats-cell'
+import {
+  SortHeader,
+  TableEmpty,
+  TablePagination,
+  TableToolbar,
+} from '#/components/table-controls'
+import { useTableView } from '#/lib/hooks/use-table-view'
+import type { TableFilter } from '#/lib/hooks/use-table-view'
 import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter/ffscouter'
 import {
   LEVELLING_TIERS,
@@ -26,7 +37,12 @@ const FF_SCOUTER_SETTING = 'tornintel.ffscouter'
 
 type Estimates = Record<string, FfScouterEstimate | null>
 type TbsStats = LevellingStatsResponse['stats']
-type SortBy = 'listed' | 'tbs' | 'ffscouter'
+
+const LIST_FILTERS: TableFilter<LevellingPlayer, string>[] = [
+  { id: 'all', label: 'All players' },
+  { id: 'listed', label: 'From the lists', test: (player) => !player.addedBy },
+  { id: 'added', label: 'Added here', test: (player) => !!player.addedBy },
+]
 
 function Levelling() {
   const [apiKey, setApiKey] = useState('')
@@ -43,21 +59,28 @@ function Levelling() {
   const [tbsNote, setTbsNote] = useState('')
   // The tier whose estimates have arrived, so a tier switch shows loading.
   const [tbsLoadedFor, setTbsLoadedFor] = useState('')
-  const [sortBy, setSortBy] = useState<SortBy>('listed')
   const [result, setResult] = useState<LevellingTargetsResponse | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState('')
   const { min, max } = LEVELLING_TIERS[tier]
-  const pool = useMemo(() => {
-    const inTier = playersInTier(tier, players)
-    const value = (player: LevellingPlayer) =>
-      sortBy === 'tbs'
-        ? tbsValue(tbs?.[player.id])
-        : (estimates[player.id]?.total ?? Infinity)
-    if (sortBy === 'listed') return inTier
-    return [...inTier].sort((a, b) => value(a) - value(b))
-  }, [estimates, players, sortBy, tbs, tier])
+  const pool = useMemo(() => playersInTier(tier, players), [players, tier])
   const ffScouterActive = useFfScouter && Boolean(ffScouterKey || apiKey)
+  // Without a sort the list keeps its recorded order, lowest total first.
+  const listView = useTableView(pool, {
+    search: (player) => [player.name, player.id, player.addedBy?.name],
+    filters: LIST_FILTERS,
+    sorts: {
+      player: (player) => player.name,
+      level: (player) => player.level,
+      total: (player) => player.total,
+      str: (player) => player.str,
+      def: (player) => player.def,
+      spd: (player) => player.spd,
+      dex: (player) => player.dex,
+      tbs: (player) => battleStatsSortValue(tbs?.[player.id]?.battleStats),
+      ffscouter: (player) => estimates[player.id]?.total,
+    },
+  })
 
   useEffect(() => {
     const savedApiKey = localStorage.getItem('tornintel.apiKey') ?? ''
@@ -77,11 +100,8 @@ function Levelling() {
 
   // One FF Scouter request covers the whole tier; results are cached server-side.
   const tierIds = useMemo(
-    () =>
-      playersInTier(tier, players)
-        .map((player) => player.id)
-        .join(','),
-    [players, tier],
+    () => pool.map((player) => player.id).join(','),
+    [pool],
   )
   useEffect(() => {
     if (!ffScouterActive || !tierIds) return
@@ -130,11 +150,12 @@ function Levelling() {
   function toggleFfScouter(enabled: boolean) {
     setUseFfScouter(enabled)
     localStorage.setItem(FF_SCOUTER_SETTING, enabled ? '1' : '0')
-    if (!enabled && sortBy === 'ffscouter') setSortBy('listed')
+    if (!enabled && listView.sort?.key === 'ffscouter') listView.setSort(null)
   }
 
   function selectTier(next: LevellingTier) {
     setTier(next)
+    listView.setPage(1)
     setResult(null)
     setError('')
   }
@@ -349,24 +370,11 @@ function Levelling() {
         <h2>
           Level {min}–{max} list
         </h2>
-        <label>
-          Sort by
-          <select
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as SortBy)}
-          >
-            <option value="listed">Listed total</option>
-            {apiKey && <option value="tbs">TBS estimate</option>}
-            {ffScouterActive && (
-              <option value="ffscouter">FF Scouter estimate</option>
-            )}
-          </select>
-        </label>
       </div>
       <p className="levelling-note">
         Listed stats are the snapshot recorded on the lists, sorted from lowest
-        total. Players added here show FF Scouter's estimate from when they were
-        added.
+        total. Click a column heading to sort. Players added here show FF
+        Scouter's estimate from when they were added.
       </p>
       {listWarning && <p className="levelling-note">{listWarning}</p>}
       {apiKey && (
@@ -376,39 +384,68 @@ function Levelling() {
           {tbsNote && ` ${tbsNote}`}
         </p>
       )}
-      <div className="table-wrap">
-        <table className="payout-table levelling-table">
-          <thead>
-            <tr>
-              <th>PLAYER</th>
-              <th>LEVEL</th>
-              <th>LISTED TOTAL</th>
-              <th>STR</th>
-              <th>DEF</th>
-              <th>SPD</th>
-              <th>DEX</th>
-              {apiKey && <th>TBS</th>}
-              {ffScouterActive && <th>FF SCOUTER</th>}
-              <th>TIER</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {pool.map((player) => (
-              <ListRow
-                key={player.id}
-                player={player}
-                estimate={ffScouterActive ? estimates[player.id] : undefined}
-                showEstimate={ffScouterActive}
-                tbs={tbs?.[player.id]}
-                showTbs={Boolean(apiKey)}
-                tbsLoaded={tbsLoadedFor === tierIds}
-                onRemove={canEdit ? () => void removePlayer(player) : undefined}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section className="panel table-panel">
+        <TableToolbar view={listView} />
+        <div className="table-wrap">
+          <table className="levelling-table">
+            <thead>
+              <tr>
+                <SortHeader view={listView} column="player">
+                  PLAYER
+                </SortHeader>
+                <SortHeader view={listView} column="level">
+                  LEVEL
+                </SortHeader>
+                <SortHeader view={listView} column="total">
+                  LISTED TOTAL
+                </SortHeader>
+                <SortHeader view={listView} column="str">
+                  STR
+                </SortHeader>
+                <SortHeader view={listView} column="def">
+                  DEF
+                </SortHeader>
+                <SortHeader view={listView} column="spd">
+                  SPD
+                </SortHeader>
+                <SortHeader view={listView} column="dex">
+                  DEX
+                </SortHeader>
+                {apiKey && (
+                  <SortHeader view={listView} column="tbs">
+                    TBS
+                  </SortHeader>
+                )}
+                {ffScouterActive && (
+                  <SortHeader view={listView} column="ffscouter">
+                    FF SCOUTER
+                  </SortHeader>
+                )}
+                <th>TIER</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {listView.pageItems.map((player) => (
+                <ListRow
+                  key={player.id}
+                  player={player}
+                  estimate={ffScouterActive ? estimates[player.id] : undefined}
+                  showEstimate={ffScouterActive}
+                  tbs={tbs?.[player.id]}
+                  showTbs={Boolean(apiKey)}
+                  tbsLoaded={tbsLoadedFor === tierIds}
+                  onRemove={
+                    canEdit ? () => void removePlayer(player) : undefined
+                  }
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <TableEmpty view={listView} noun="players" />
+        <TablePagination view={listView} noun="players" />
+      </section>
     </main>
   )
 }
@@ -431,6 +468,18 @@ function DiscoverPanel({
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState('')
   const { min, max } = LEVELLING_TIERS[tier]
+  const foundView = useTableView(found ?? [], {
+    search: (player) => [player.name, player.id],
+    sorts: {
+      player: (player) => player.name,
+      level: (player) => player.level,
+      ffscouter: (player) => player.estimate?.total,
+      // Most recently active first when sorted ascending.
+      lastAction: (player) =>
+        player.lastActionAt === null ? null : -player.lastActionAt,
+    },
+    pageSize: 10,
+  })
 
   async function search() {
     setIsSearching(true)
@@ -441,6 +490,7 @@ function DiscoverPanel({
         { apiKey, ffScouterKey },
       )
       setFound(response.players)
+      foundView.setPage(1)
     } catch (requestError) {
       setError(errorMessage(requestError))
     } finally {
@@ -507,56 +557,69 @@ function DiscoverPanel({
         <p className="levelling-note">No players matched these filters.</p>
       )}
       {found && found.length > 0 && (
-        <div className="table-wrap">
-          <table className="payout-table levelling-table">
-            <thead>
-              <tr>
-                <th>PLAYER</th>
-                <th>LEVEL</th>
-                <th>FF SCOUTER</th>
-                <th>LAST ACTION</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {found.map((player) => (
-                <tr key={player.id}>
-                  <td>
-                    <a
-                      href={profileUrl(player.id)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {player.name}
-                    </a>
-                  </td>
-                  <td>{player.level}</td>
-                  <td>
-                    <EstimateText estimate={player.estimate} />
-                  </td>
-                  <td>
-                    {player.lastActionAt
-                      ? relativeDays(player.lastActionAt)
-                      : '—'}
-                  </td>
-                  <td>
-                    <button
-                      className="add-button"
-                      disabled={player.onList || busyId !== null}
-                      onClick={() => void add(player)}
-                    >
-                      {player.onList
-                        ? 'On list'
-                        : busyId === player.id
-                          ? 'Adding...'
-                          : 'Add to list'}
-                    </button>
-                  </td>
+        <section className="panel table-panel">
+          <TableToolbar view={foundView} />
+          <div className="table-wrap">
+            <table className="payout-table levelling-table">
+              <thead>
+                <tr>
+                  <SortHeader view={foundView} column="player">
+                    PLAYER
+                  </SortHeader>
+                  <SortHeader view={foundView} column="level">
+                    LEVEL
+                  </SortHeader>
+                  <SortHeader view={foundView} column="ffscouter">
+                    FF SCOUTER
+                  </SortHeader>
+                  <SortHeader view={foundView} column="lastAction">
+                    LAST ACTION
+                  </SortHeader>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {foundView.pageItems.map((player) => (
+                  <tr key={player.id}>
+                    <td>
+                      <a
+                        href={profileUrl(player.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {player.name}
+                      </a>
+                    </td>
+                    <td>{player.level}</td>
+                    <td>
+                      <EstimateText estimate={player.estimate} />
+                    </td>
+                    <td>
+                      {player.lastActionAt
+                        ? relativeDays(player.lastActionAt)
+                        : '—'}
+                    </td>
+                    <td>
+                      <button
+                        className="add-button"
+                        disabled={player.onList || busyId !== null}
+                        onClick={() => void add(player)}
+                      >
+                        {player.onList
+                          ? 'On list'
+                          : busyId === player.id
+                            ? 'Adding...'
+                            : 'Add to list'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <TableEmpty view={foundView} noun="players" />
+          <TablePagination view={foundView} noun="players" />
+        </section>
       )}
     </section>
   )
@@ -658,11 +721,6 @@ function TbsText({
       {estimate === null && lowerBound !== null && '+'}
     </span>
   )
-}
-
-function tbsValue(stats: TbsStats[string] | undefined) {
-  const estimate = stats?.battleStats
-  return estimate?.estimate ?? estimate?.lowerBound ?? Infinity
 }
 
 function EstimateText({

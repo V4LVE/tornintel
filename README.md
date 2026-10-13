@@ -24,6 +24,7 @@ npm start
 - `src/routes/payouts.tsx`: ranked war payout calculator.
 - `src/routes/war-deals.tsx`: war deal planning and editable proposals for both outcomes. With a saved API key, faction names, current war target, item market prices, and each faction's latest completed cache rewards load automatically. Cache counts are a labeled historical baseline, not a prediction for the entered scores; all values can be adjusted manually. Compensation uses the losing faction's score, with whole items and a cash remainder. Payment wording appears only when a rate or timing is supplied. Manual planning remains available without an API key at `/war-deals`.
 - `src/routes/levelling.tsx`: levelling targets grouped into tiers of ten levels.
+- `src/components/table-controls.tsx` and `src/lib/hooks/use-table-view.ts`: shared search, filter tabs, sortable column headings and pagination used by every list.
 - `src/routes/settings.tsx`: API key and connected account settings.
 - `src/routes/api/`: server endpoints, grouped per feature in route-group folders such as `(levelling)/` that do not change the URL.
 - `src/lib/<feature>/`: logic per feature (`torn`, `war-hospital`, `travel`, `battle-stats`, `levelling`, `ffscouter`, `war-deals`, `auth`, `hooks`), with tests next to the code.
@@ -48,7 +49,7 @@ npm run build
 
 The bundled players live in `src/lib/levelling/players.json` as an array of `{ name, id, lvl, total, str, def, spd, dex }` (numbers may be strings with commas; a duplicate ID keeps the first entry). Their stats are a recorded snapshot: Torn's API only returns battle stats for the key owner.
 
-With a saved API key the list also shows a TBS column: the same Fair Fight based estimate as the war hospital target list, from the shared evidence in PostgreSQL (see Shared TBS storage below). Loading it shares the viewer's recent fights, so attacks on levelling targets improve the estimates for everyone. Players without recorded fights show No FF evidence. The list can be sorted by listed total, TBS, or FF Scouter estimate.
+With a saved API key the list also shows a TBS column: the same Fair Fight based estimate as the war hospital target list, from the shared evidence in PostgreSQL (see Shared TBS storage below). Loading it shares the viewer's recent fights, so attacks on levelling targets improve the estimates for everyone. Players without recorded fights show No FF evidence. Click a column heading to sort the list (for example by level, listed total, TBS or FF Scouter estimate); it can also be searched and filtered to players from the original lists or players added in tornintel.
 
 ### FF Scouter
 

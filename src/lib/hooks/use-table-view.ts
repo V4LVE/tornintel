@@ -69,6 +69,9 @@ export function useTableView<
       ? sortItems(filtered, sortValue, sort.direction)
       : filtered
   const current = paginate(sorted, page, pageSize)
+  // Remember the clamped page; otherwise a list that shrinks and grows back
+  // jumps to the old page without the viewer doing anything.
+  if (current.page !== page) setPage(current.page)
 
   return {
     query,

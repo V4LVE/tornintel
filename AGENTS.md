@@ -39,7 +39,7 @@ npm run db:migrate       # run migrations against DATABASE_URL
 - The dev server regenerates `src/routeTree.gen.ts` whenever route files change. Never `git stash` while it runs: the regenerated file blocks `git stash pop` (recover with `git checkout -- src/routeTree.gen.ts`, then pop again).
 - Do not use `npx tsr generate`: it drops the `@tanstack/react-start` registration from the route tree, breaking types in every API route. Regenerate with `npx vite build`. Never edit `routeTree.gen.ts` by hand.
 - `npm ci` and builds can rewrite `package-lock.json`. Restore it with `git checkout -- package-lock.json` unless dependencies changed on purpose.
-- Known noise that predates current work: `npx tsc --noEmit` reports 10 drizzle-orm type errors and eslint reports 2 errors in `src/lib/travel.integration.test.ts`. Any other errors are yours.
+- Known noise that predates current work: `npx tsc --noEmit` reports 18 drizzle-orm type errors (in `src/db/`, travel, shared evidence and faction sharing, including their integration tests) and eslint reports 2 errors in `src/lib/travel/travel.integration.test.ts`. Any other errors are yours.
 - The working copy uses CRLF (autocrlf) and the index stores LF (`.gitattributes`). `prettier.config.js` sets `endOfLine: 'auto'` so prettier keeps each file's line endings.
 - Format only the files you changed (`npx prettier --write <files>`). Never `npm run format` or `prettier --write .`: it touches the whole repo. Before finishing, check `git diff --stat` and revert line-ending-only or whitespace-only changes to unrelated files.
 - When moving types or functions between files, let the compiler find the references: move, run `npx tsc --noEmit`, fix every new error, repeat. Text-replacement scripts miss references inside function bodies.
@@ -49,13 +49,14 @@ npm run db:migrate       # run migrations against DATABASE_URL
 
 ### Pages (`src/routes/`)
 
-| Route        | File            | Contents                                                                                                                    |
-| ------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `/`          | `index.tsx`     | War hospital: opposing members (hospital, ready, travel), chain tracker, energy, keep-alive chain target, TBS, theme toggle |
-| `/levelling` | `levelling.tsx` | Levelling targets in 10 tiers of 10 levels, Find 3 targets, TBS, FF Scouter estimates and new-player search, shared list    |
-| `/payouts`   | `payouts.tsx`   | Ranked war payout calculator (war and non-war hits × rate, capped at earnings)                                              |
-| `/war-deals` | `war-deals.tsx` | War deal proposals for both outcomes (compensation = losing score × rate, whole items plus a cash remainder)                |
-| `/settings`  | `settings.tsx`  | Torn API key and optional FF Scouter key                                                                                    |
+| Route        | File            | Contents                                                                                                                      |
+| ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `/`          | `index.tsx`     | War hospital: opposing members (hospital, ready, travel), chain tracker, energy, keep-alive chain target, TBS, theme toggle   |
+| `/levelling` | `levelling.tsx` | Levelling targets in 10 tiers of 10 levels, Find 3 targets, TBS, FF Scouter estimates and new-player search, shared list      |
+| `/payouts`   | `payouts.tsx`   | Ranked war payout calculator (war and non-war hits × rate, capped at earnings)                                                |
+| `/war-deals` | `war-deals.tsx` | War deal proposals for both outcomes (compensation = losing score × rate, whole items plus a cash remainder)                  |
+| `/my-stats`  | `my-stats.tsx`  | Own battle stats and 7D–1Y progress, opt-in sharing with the faction, faction list with shared stats and FF Scouter estimates |
+| `/settings`  | `settings.tsx`  | Torn API key and optional FF Scouter key                                                                                      |
 
 `__root.tsx` holds the HTML document, favicon links, the theme boot script and `notFoundComponent`. Its `component` wraps every page in `SessionProvider` and `AppShell`, so pages render inside the shared sidebar and top bar and navigate client-side with `Link` (no full page loads, no back links).
 
@@ -87,7 +88,7 @@ API route folders in parentheses are TanStack route groups: they organize files 
 
 ### API routes (`src/routes/api/`)
 
-Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling)` levelling-*; `(account)` user, ffscouter-key; `(payouts)` payout-hits; `(war-deals)` war-deal-defaults; `auth/$`.
+Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling)` levelling-*; `(account)` user, ffscouter-key; `(my-stats)` my-stats, my-stats-history, stat-sharing, faction-stats; `(payouts)` payout-hits; `(war-deals)` war-deal-defaults; `auth/$`.
 
 - **`user`**: verifies the key (used by `verifyTornUser` in `src/lib/torn/torn-user.ts`).
 - **`faction-members`**: opposing members with status, travel and TBS. Without `factionId`, `src/lib/war-hospital/enemy-faction.server.ts` picks the opponent in the current or upcoming ranked war, then the last ranked war, then `TORN_ENEMY_FACTION_ID`.
@@ -99,6 +100,9 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
   - Removing players and restoring removed ones is limited to trusted editors (`isLevellingEditor`, configured with `LEVELLING_EDITOR_IDS`/`LEVELLING_EDITOR_FACTION_IDS`); anyone with a key can add new players. GET with a key returns `canEdit` so the UI only shows Remove to editors. Any change that affects every user must check permissions, not just identity.
 - **`levelling-targets`**: random targets from a tier, checked with Torn `basic`. At most 12 checks, three at a time.
 - **`levelling-stats`**: Fair Fight based TBS estimates for a list of IDs.
+- **`my-stats`** and **`my-stats-history`**: the key owner's battle stats (v2 `battlestats`) and a historical `personalstats` reading for one timestamp. Both also store the reading when the owner shares with their faction.
+- **`stat-sharing`**: GET the viewer's sharing state; POST `{enabled}` to opt in (requires a faction, records current stats) or out (deletes everything shared).
+- **`faction-stats`**: the viewer's own faction with shared stats and history. The faction comes from the viewer's key, so shared stats only reach members of the same faction. FF Scouter estimates only with `?ffscouter=1`.
 - **`levelling-estimates`**, **`levelling-discover`** and **`ffscouter-key`**: proxies to FF Scouter's `get-stats`, `get-targets` and `check-key`.
 - **`auth/$`**: Better Auth scaffolding. No page uses it and no database adapter is configured.
 
@@ -114,7 +118,9 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
 - **`ffscouter/`** (`ffscouter.ts`, `ffscouter.server.ts`): FF Scouter client. Estimates are cached for 5 minutes per key, because fair fight is relative to the key owner. `ffScouterKeyFrom(request)` uses `X-FfScouter-Key` and falls back to the Torn key.
 - **`war-deals/`**: war deal summaries, message generation and Torn data loading.
 - **`war-hospital/`**: `enemy-faction.server.ts` (picks the opponent faction).
+- **`battle-stats/my-stats.ts`** and **`battle-stats/faction-sharing.server.ts`**: My stats helpers, `fetchPlayerIdentity` (who owns a key, from Torn) and `statSharingRepository`. Readings are bucketed per UTC day.
 - **`hooks/use-visible-polling.ts`**: polling without overlapping requests, only while the tab is visible.
+- **`hooks/use-stat-history.ts`**: My stats history, cached per player in `tornintel.statHistory.<id>`.
 - **`hooks/use-table-view.ts`** and **`table-view/`**: client-side search, filter tabs, column sorting and pagination. Missing sort values always go last; the page is clamped so polling refreshes keep the current page.
 
 ### Models (`src/models/`)
@@ -150,6 +156,7 @@ Every shared type and DTO, so the API route and the page use the same definition
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `shared_fair_fight_observations`                                   | Shared Fair Fight evidence for TBS, shared between all users                                            |
 | `faction_member_travel`                                            | Shared travel snapshots                                                                                 |
+| `stat_sharing`, `shared_stat_snapshots`                            | Players sharing real stats with their faction, and their daily readings. Opting out deletes both        |
 | `levelling_list_changes`                                           | Players added to or removed from the levelling list. Removal is a soft delete; adding again restores it |
 | `todos`, `battle_stat_evidence`, `battle_stat_calibration_samples` | Unused (template leftover or planned)                                                                   |
 
@@ -161,7 +168,7 @@ Everything must work without `DATABASE_URL`. Each storage feature checks `proces
   - The Torn key lives only in the browser's localStorage (`tornintel.apiKey`). It is sent in the `X-Torn-Api-Key` header and to Torn as the `key` parameter.
   - Never log keys, store them on the server, or include them in cache keys.
   - The FF Scouter key lives in `tornintel.ffscouterKey` and is sent as `X-FfScouter-Key`. The UI says clearly when a key is sent to ffscouter.com.
-- **localStorage keys** use the `tornintel.` prefix: `apiKey`, `ffscouterKey`, `ffscouter`, `manualFactionId`, `hospitalPaused`, `paidPayouts`, `theme`. Store only per-viewer conveniences there, not shared state.
+- **localStorage keys** use the `tornintel.` prefix: `apiKey`, `ffscouterKey`, `ffscouter`, `manualFactionId`, `hospitalPaused`, `paidPayouts`, `theme`, `statHistory.<playerId>`. Store only per-viewer conveniences there, not shared state.
 - **API routes:**
   - Shape: `createFileRoute('/api/x')({ server: { handlers: { GET } } })`, with helpers below `Route` in the same file. Export nothing but `Route` from a route file; shared helpers belong in `src/lib`.
   - Errors always use `Response.json({ error: 'Full sentence.' }, { status })`: 401 missing key, 400 validation, 403 not allowed, 404/409 for lookups, 502 for Torn or FF Scouter failures (pass `TornApiError.message` through), 503 without storage.

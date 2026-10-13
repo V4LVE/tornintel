@@ -47,7 +47,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         icon: '^',
         link: { to: '/levelling' },
       },
-      { label: 'My stats', icon: '↑' },
+      { label: 'My stats', icon: '↑', link: { to: '/my-stats' } },
     ],
   },
 ]

@@ -1,7 +1,8 @@
 name: CI
 
-# Checks every pull request and every push to main. Each job shows up as its
-# own check on the pull request. Deploys stay in coolify-deploy.yml.
+# Checks every pull request and every push to main in one job. Each check is
+# its own step and runs even when an earlier check failed, so one run shows
+# every problem. Deploys stay in coolify-deploy.yml.
 on:
   pull_request:
   push:
@@ -16,52 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint and format
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - name: ESLint
-        run: npm run lint
-      - name: Prettier
-        run: npx prettier --check .
-
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npx tsc --noEmit
-
-  test:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm test
-
-  integration:
-    name: Integration tests (Postgres)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16-alpine
@@ -76,34 +35,50 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      # A throwaway database that only exists for this job.
-      DATABASE_URL: postgres://tornintel:tornintel@localhost:5432/tornintel
-      TORNINTEL_DB_TEST: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      - name: Install
+        id: install
+        run: npm ci --no-audit --no-fund
+
+      # Once the install worked, every check runs even after an earlier one
+      # failed; the job still fails if any of them did.
+      - name: ESLint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+      - name: Prettier
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx prettier --check .
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx tsc --noEmit
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test
+
       - name: Run migrations
+        id: migrate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          # A throwaway database that only exists for this job.
+          DATABASE_URL: postgres://tornintel:tornintel@localhost:5432/tornintel
         run: npm run db:migrate
-      - name: Integration tests
+      - name: Integration tests (Postgres)
+        if: ${{ !cancelled() && steps.migrate.outcome == 'success' }}
+        env:
+          DATABASE_URL: postgres://tornintel:tornintel@localhost:5432/tornintel
+          TORNINTEL_DB_TEST: '1'
         run: npx tsx --test "src/**/*.integration.test.ts"
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm run build
+      - name: Build
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
       # The build regenerates the route tree; a diff means it was not committed.
       - name: Route tree is up to date
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: git diff --exit-code -- src/routeTree.gen.ts

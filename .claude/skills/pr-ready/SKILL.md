@@ -16,7 +16,7 @@ Do every step, then report once. Never push, commit or open the PR unless the us
 
 Run `npm test`, `npx tsc --noEmit`, `npm run lint` and `npx prettier --check --end-of-line auto <changed files>`.
 
-- Tsc and lint are clean on a fresh install, so every error counts; `TS7016` for `drizzle-orm` means a broken local install (see AGENTS.md), not a code problem. Report every failure with file and line. On an open PR, also read the CI checks: `gh pr checks <n>`.
+- Tsc and lint are clean on a fresh install, so every error counts; `TS7016` for `drizzle-orm` means a broken local install (see AGENTS.md), not a code problem. Report every failure with file and line. On an open PR, also read CI: `gh pr checks <n>` shows the one `CI` check, and `gh run view <run-id> --log-failed` shows which step failed.
 - Prettier: check and fix only files changed on the branch (`git diff --name-only main...HEAD` plus uncommitted ones, `.ts/.tsx/.css/.md` that still exist). Never run `npm run format` or `prettier --write .`.
 - Do not start a dev server; the user usually runs one on port 3000.
 

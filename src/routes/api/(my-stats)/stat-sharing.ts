@@ -65,7 +65,7 @@ export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
         try {
           const identity = await fetchPlayerIdentity(apiKey)
           if (!body.enabled) {
-            await statSharingRepository.disable(identity.id)
+            await statSharingRepository.disable(identity)
             return Response.json(
               { isSharing: false } satisfies StatSharingResponse,
               {

@@ -449,8 +449,8 @@ function FactionStats({
             <h2>Share with your faction</h2>
             <p>
               {isSharing
-                ? `Members of ${faction} can see your real stats and progression. They update whenever you open this page.`
-                : `Let members of ${faction} see your real battle stats and how they progress. Turning this off deletes what was shared.`}
+                ? `Sharing is on by default: members of ${faction} see your real stats and progression, updated whenever you open this page. Turning it off deletes what was shared.`
+                : `You turned sharing off. Turn it on to let members of ${faction} see your real battle stats and how they progress.`}
             </p>
           </div>
           <label className="share-toggle">

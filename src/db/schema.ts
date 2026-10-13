@@ -40,6 +40,9 @@ export const statSharing = pgTable(
     playerId: text('player_id').primaryKey(),
     playerName: text('player_name').notNull(),
     factionId: text('faction_id').notNull(),
+    // Sharing is on by default; an opt-out keeps the row with false so the
+    // choice is remembered.
+    enabled: boolean('enabled').notNull().default(true),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => [index('stat_sharing_faction_idx').on(table.factionId)],

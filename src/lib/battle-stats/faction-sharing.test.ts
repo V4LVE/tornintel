@@ -284,7 +284,7 @@ test('records a historical reading with the time Torn observed it', async (conte
   })
 })
 
-test('disabling sharing deletes the key owner data', async (context) => {
+test('disabling sharing opts the key owner out', async (context) => {
   await withDatabase(async () => {
     mockUpstream(context)
     const disable = context.mock.method(
@@ -294,7 +294,11 @@ test('disabling sharing deletes the key owner data', async (context) => {
     )
     const response = await invoke(StatSharingRoute, 'POST', { enabled: false })
     assert.equal(response.status, 200)
-    assert.deepEqual(disable.mock.calls[0].arguments, ['1'])
+    const [owner] = disable.mock.calls[0].arguments as Parameters<
+      typeof statSharingRepository.disable
+    >
+    assert.equal(owner.id, '1')
+    assert.equal(owner.factionId, '555')
   })
 })
 

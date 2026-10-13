@@ -43,20 +43,20 @@ npm run db:migrate       # run migrations against DATABASE_URL
 - The working copy uses CRLF (autocrlf) and the index stores LF (`.gitattributes`). `prettier.config.js` sets `endOfLine: 'auto'` so prettier keeps each file's line endings.
 - Format only the files you changed (`npx prettier --write <files>`). Never `npm run format` or `prettier --write .`: it touches the whole repo. Before finishing, check `git diff --stat` and revert line-ending-only or whitespace-only changes to unrelated files.
 - When moving types or functions between files, let the compiler find the references: move, run `npx tsc --noEmit`, fix every new error, repeat. Text-replacement scripts miss references inside function bodies.
-- CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main`, as separate checks: lint and `prettier --check .`, typecheck, unit tests, integration tests against a throwaway Postgres (migrations, then `TORNINTEL_DB_TEST=1`), and a build that fails when `src/routeTree.gen.ts` was not regenerated. Deploying is separate: `.github/workflows/coolify-deploy.yml` builds the Docker image and calls the Coolify webhook on push to `main`, whether or not CI passed.
+- CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main` as one job (one `CI` check) with a step per check: ESLint, `prettier --check .`, typecheck, unit tests, migrations and integration tests against a throwaway Postgres (`TORNINTEL_DB_TEST=1`), and a build that fails when `src/routeTree.gen.ts` was not regenerated. After a successful install every step runs even when an earlier one failed, so one run shows every problem; open the run to see which step failed. Deploying is separate: `.github/workflows/coolify-deploy.yml` builds the Docker image and calls the Coolify webhook on push to `main`, whether or not CI passed.
 
 ## Architecture
 
 ### Pages (`src/routes/`)
 
-| Route        | File            | Contents                                                                                                                      |
-| ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `/`          | `index.tsx`     | War hospital: opposing members (hospital, ready, travel), chain tracker, energy, keep-alive chain target, TBS                 |
-| `/levelling` | `levelling.tsx` | Levelling targets in 10 tiers of 10 levels, Find 3 targets, TBS, FF Scouter estimates and new-player search, shared list      |
-| `/payouts`   | `payouts.tsx`   | Ranked war payout calculator (war and non-war hits × rate, capped at earnings)                                                |
-| `/war-deals` | `war-deals.tsx` | War deal proposals for both outcomes (compensation = losing score × rate, whole items plus a cash remainder)                  |
-| `/my-stats`  | `my-stats.tsx`  | Own battle stats and 7D–1Y progress, opt-in sharing with the faction, faction list with shared stats and FF Scouter estimates |
-| `/settings`  | `settings.tsx`  | Torn API key and optional FF Scouter key                                                                                      |
+| Route        | File            | Contents                                                                                                                               |
+| ------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`          | `index.tsx`     | War hospital: opposing members (hospital, ready, travel), chain tracker, energy, keep-alive chain target, TBS                          |
+| `/levelling` | `levelling.tsx` | Levelling targets in 10 tiers of 10 levels, Find 3 targets, TBS, FF Scouter estimates and new-player search, shared list               |
+| `/payouts`   | `payouts.tsx`   | Ranked war payout calculator (war and non-war hits × rate, capped at earnings)                                                         |
+| `/war-deals` | `war-deals.tsx` | War deal proposals for both outcomes (compensation = losing score × rate, whole items plus a cash remainder)                           |
+| `/my-stats`  | `my-stats.tsx`  | Own battle stats and 7D–1Y progress, sharing with the faction (on by default), faction list with shared stats and FF Scouter estimates |
+| `/settings`  | `settings.tsx`  | Torn API key and optional FF Scouter key                                                                                               |
 
 `__root.tsx` holds the HTML document, favicon links, the theme boot script and `notFoundComponent`. Its `component` wraps every page in `SessionProvider` and `AppShell`, so pages render inside the shared sidebar and top bar and navigate client-side with `Link` (no full page loads, no back links).
 
@@ -100,8 +100,8 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
   - Removing players and restoring removed ones is limited to trusted editors (`isLevellingEditor`, configured with `LEVELLING_EDITOR_IDS`/`LEVELLING_EDITOR_FACTION_IDS`); anyone with a key can add new players. GET with a key returns `canEdit` so the UI only shows Remove to editors. Any change that affects every user must check permissions, not just identity.
 - **`levelling-targets`**: random targets from a tier, checked with Torn `basic`. At most 12 checks, three at a time.
 - **`levelling-stats`**: Fair Fight based TBS estimates for a list of IDs.
-- **`my-stats`** and **`my-stats-history`**: the key owner's battle stats (v2 `battlestats`) and a historical `personalstats` reading for one timestamp. Both also store the reading when the owner shares with their faction.
-- **`stat-sharing`**: GET the viewer's sharing state; POST `{enabled}` to opt in (requires a faction, records current stats) or out (deletes everything shared).
+- **`my-stats`** and **`my-stats-history`**: the key owner's battle stats (v2 `battlestats`) and a historical `personalstats` reading for one timestamp. Both also store the reading unless the owner turned sharing off; a player seen for the first time starts sharing.
+- **`stat-sharing`**: GET the viewer's sharing state; POST `{enabled}` to turn sharing back on (requires a faction, records current stats) or off (deletes everything shared and keeps `enabled = false`, so the default does not switch it back on). Sharing is on by default.
 - **`faction-stats`**: the viewer's own faction with shared stats and history. The faction comes from the viewer's key, so shared stats only reach members of the same faction. FF Scouter estimates only with `?ffscouter=1`.
 - **`levelling-estimates`**, **`levelling-discover`** and **`ffscouter-key`**: proxies to FF Scouter's `get-stats`, `get-targets` and `check-key`.
 - **`auth/$`**: Better Auth scaffolding. No page uses it and no database adapter is configured.
@@ -153,13 +153,13 @@ Every shared type and DTO, so the API route and the page use the same definition
 
 ### Database (`src/db/schema.ts`, migrations in `drizzle/`)
 
-| Table                                                              | Purpose                                                                                                 |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `shared_fair_fight_observations`                                   | Shared Fair Fight evidence for TBS, shared between all users                                            |
-| `faction_member_travel`                                            | Shared travel snapshots                                                                                 |
-| `stat_sharing`, `shared_stat_snapshots`                            | Players sharing real stats with their faction, and their daily readings. Opting out deletes both        |
-| `levelling_list_changes`                                           | Players added to or removed from the levelling list. Removal is a soft delete; adding again restores it |
-| `todos`, `battle_stat_evidence`, `battle_stat_calibration_samples` | Unused (template leftover or planned)                                                                   |
+| Table                                                              | Purpose                                                                                                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `shared_fair_fight_observations`                                   | Shared Fair Fight evidence for TBS, shared between all users                                                                                           |
+| `faction_member_travel`                                            | Shared travel snapshots                                                                                                                                |
+| `stat_sharing`, `shared_stat_snapshots`                            | Who shares real stats with their faction (on by default, `enabled = false` after an opt-out) and their daily readings. Opting out deletes the readings |
+| `levelling_list_changes`                                           | Players added to or removed from the levelling list. Removal is a soft delete; adding again restores it                                                |
+| `todos`, `battle_stat_evidence`, `battle_stat_calibration_samples` | Unused (template leftover or planned)                                                                                                                  |
 
 Everything must work without `DATABASE_URL`. Each storage feature checks `process.env.DATABASE_URL` itself, falls back (own data only or temporary memory) and returns a `warning`/`reason` that the UI shows. Writes return 503 without a database.
 

@@ -43,6 +43,13 @@
       "when": 1791903376296,
       "tag": "0005_snapshot_observed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791909428300,
+      "tag": "0006_stat_sharing_enabled",
+      "breakpoints": true
     }
   ]
 }

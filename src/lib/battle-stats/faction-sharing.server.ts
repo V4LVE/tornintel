@@ -30,12 +30,13 @@ export async function fetchPlayerIdentity(
 }
 
 export const statSharingRepository = {
+  // Sharing is on by default, so a player without a row is sharing.
   async isSharing(playerId: string) {
     const rows = await db
-      .select({ playerId: statSharing.playerId })
+      .select({ enabled: statSharing.enabled })
       .from(statSharing)
       .where(eq(statSharing.playerId, playerId))
-    return rows.length > 0
+    return rows.length === 0 || rows[0].enabled
   },
   async enable(identity: PlayerIdentity & { factionId: string }) {
     await db
@@ -44,43 +45,64 @@ export const statSharingRepository = {
         playerId: identity.id,
         playerName: identity.name,
         factionId: identity.factionId,
+        enabled: true,
       })
       .onConflictDoUpdate({
         target: statSharing.playerId,
         set: {
           playerName: identity.name,
           factionId: identity.factionId,
+          enabled: true,
           updatedAt: new Date(),
         },
       })
   },
-  // Opting out removes everything that was shared.
-  async disable(playerId: string) {
+  // Opting out deletes everything that was shared and remembers the choice, so
+  // the default does not switch sharing back on.
+  async disable(identity: PlayerIdentity) {
     await db.transaction(async (tx) => {
+      // Writing the row first waits for any record() holding its lock, so the
+      // delete below sees that record's snapshots.
+      await tx
+        .insert(statSharing)
+        .values({
+          playerId: identity.id,
+          playerName: identity.name,
+          factionId: identity.factionId ?? '',
+          enabled: false,
+        })
+        .onConflictDoUpdate({
+          target: statSharing.playerId,
+          set: { enabled: false, updatedAt: new Date() },
+        })
       await tx
         .delete(sharedStatSnapshots)
-        .where(eq(sharedStatSnapshots.playerId, playerId))
-      await tx.delete(statSharing).where(eq(statSharing.playerId, playerId))
+        .where(eq(sharedStatSnapshots.playerId, identity.id))
     })
   },
   /**
-   * Saves readings only if the player is still sharing, and refreshes their
-   * faction. Each point's timestamp is its day bucket; a reading replaces the
+   * Saves readings unless the player opted out, and refreshes their faction.
+   * A player seen for the first time starts sharing, because that is the default. Each point's timestamp is its day bucket; a reading replaces the
    * stored one for that day only when it was observed at the same time or later.
    */
   async record(identity: PlayerIdentity, points: ObservedStatPoint[]) {
     if (points.length === 0) return
     await db.transaction(async (tx) => {
-      const updated = await tx
-        .update(statSharing)
-        .set({
-          playerName: identity.name,
-          factionId: identity.factionId ?? '',
-          updatedAt: new Date(),
+      const profile = {
+        playerName: identity.name,
+        factionId: identity.factionId ?? '',
+      }
+      // Returns nothing when the row exists with sharing turned off.
+      const sharing = await tx
+        .insert(statSharing)
+        .values({ playerId: identity.id, ...profile })
+        .onConflictDoUpdate({
+          target: statSharing.playerId,
+          set: { ...profile, updatedAt: new Date() },
+          setWhere: eq(statSharing.enabled, true),
         })
-        .where(eq(statSharing.playerId, identity.id))
         .returning({ playerId: statSharing.playerId })
-      if (updated.length === 0) return
+      if (sharing.length === 0) return
       for (const point of points) {
         const row = { ...point, playerId: identity.id }
         await tx
@@ -105,6 +127,7 @@ export const statSharingRepository = {
       .where(
         and(
           eq(statSharing.factionId, factionId),
+          eq(statSharing.enabled, true),
           inArray(statSharing.playerId, memberIds),
         ),
       )
@@ -135,7 +158,7 @@ export const statSharingRepository = {
 }
 
 /**
- * Stores server-fetched readings for a player who opted in. Recording is
+ * Stores server-fetched readings unless the player opted out. Recording is
  * best effort: My stats keeps working if Torn or the database is unavailable.
  */
 export async function recordSharedStats(

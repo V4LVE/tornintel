@@ -3,21 +3,8 @@ import { db } from '#/db'
 import { sharedStatSnapshots, statSharing } from '#/db/schema'
 import { fetchTorn } from '#/lib/torn/torn-api.server'
 import { dayEnd } from './my-stats'
-import type { ObservedStatPoint } from './my-stats'
-
-export type PlayerIdentity = {
-  id: string
-  name: string
-  /** Null when the player is not in a faction. */
-  factionId: string | null
-  factionName: string | null
-}
-
-type TornProfileResponse = {
-  player_id?: number
-  name?: string
-  faction?: { faction_id?: number; faction_name?: string }
-}
+import type { ObservedStatPoint, PlayerIdentity } from '#/models/my-stats'
+import type { TornUserResponse } from '#/models/torn'
 
 const HISTORY_DAYS = 365
 
@@ -28,7 +15,7 @@ export async function fetchPlayerIdentity(
   const url = new URL('https://api.torn.com/user/')
   url.searchParams.set('selections', 'profile')
   url.searchParams.set('key', apiKey)
-  const { data } = await fetchTorn<TornProfileResponse>(url, {
+  const { data } = await fetchTorn<TornUserResponse>(url, {
     maxAgeMs: 5 * 60 * 1000,
   })
   if (!data.player_id || !data.name)

@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { sampleTimestamps } from '#/lib/battle-stats/my-stats'
-import type { RangeKey, StatPoint } from '#/lib/battle-stats/my-stats'
+import type {
+  RangeKey,
+  StatHistoryResponse,
+  StatPoint,
+} from '#/models/my-stats'
 
 const CONCURRENCY = 3
 
@@ -44,8 +48,7 @@ async function fetchStatsAt(
     headers: { 'X-Torn-Api-Key': apiKey },
     signal,
   })
-  const payload = (await response.json()) as {
-    point?: StatPoint | null
+  const payload = (await response.json()) as Partial<StatHistoryResponse> & {
     error?: string
   }
   if (!response.ok || payload.error)

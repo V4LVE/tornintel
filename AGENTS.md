@@ -118,7 +118,7 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
 - **`ffscouter/`** (`ffscouter.ts`, `ffscouter.server.ts`): FF Scouter client. Estimates are cached for 5 minutes per key, because fair fight is relative to the key owner. `ffScouterKeyFrom(request)` uses `X-FfScouter-Key` and falls back to the Torn key.
 - **`war-deals/`**: war deal summaries, message generation and Torn data loading.
 - **`war-hospital/`**: `enemy-faction.server.ts` (picks the opponent faction).
-- **`battle-stats/my-stats.ts`** and **`battle-stats/faction-sharing.server.ts`**: My stats helpers, `fetchPlayerIdentity` (who owns a key, from Torn) and `statSharingRepository`. Readings are bucketed per UTC day.
+- **`battle-stats/my-stats.ts`** and **`battle-stats/faction-sharing.server.ts`**: My stats helpers (stat names, ranges, build summary, `dayEnd`), `fetchPlayerIdentity` (who owns a key, from Torn) and `statSharingRepository`. Readings are bucketed per UTC day.
 - **`hooks/use-visible-polling.ts`**: polling without overlapping requests, only while the tab is visible.
 - **`hooks/use-stat-history.ts`**: My stats history, cached per player in `tornintel.statHistory.<id>`.
 - **`hooks/use-table-view.ts`** and **`table-view/`**: client-side search, filter tabs, column sorting and pagination. Missing sort values always go last; the page is clamped so polling refreshes keep the current page.
@@ -127,17 +127,18 @@ Groups: `(war-hospital)` faction-members, chain-target, combat-bars; `(levelling
 
 Every shared type and DTO, so the API route and the page use the same definition. Files hold only `type` declarations (no runtime code) and import each other with `import type`:
 
-| File              | Contents                                                                                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| `account.ts`      | `UserProfile` and the `/api/user` response                                                              |
-| `battle-stats.ts` | Battle stats, Fair Fight observations, `BattleStatsEstimate`, shared evidence and contributors          |
-| `ffscouter.ts`    | FF Scouter API shapes, `FfScouterEstimate`, key status                                                  |
-| `levelling.ts`    | `LevellingTier`, list players and changes, `/api/levelling-*` responses                                 |
-| `payouts.ts`      | Payout players, wars and `/api/payout-hits` responses                                                   |
-| `torn.ts`         | Raw Torn API responses as tornintel reads them (`TornAttack`, `TornBasicProfile`, `TornRankedWar`, ...) |
-| `travel.ts`       | Member status, travel snapshots and estimates                                                           |
-| `war-deals.ts`    | `CacheEstimate`, `DealDefaults`                                                                         |
-| `war-hospital.ts` | `WarTarget`, `FactionMembersResponse`, `CombatBarsResponse`, chain target and enemy faction types       |
+| File              | Contents                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `account.ts`      | `UserProfile` and the `/api/user` response                                                                                  |
+| `battle-stats.ts` | Battle stats, Fair Fight observations, `BattleStatsEstimate`, shared evidence and contributors                              |
+| `ffscouter.ts`    | FF Scouter API shapes, `FfScouterEstimate`, key status                                                                      |
+| `levelling.ts`    | `LevellingTier`, list players and changes, `/api/levelling-*` responses                                                     |
+| `my-stats.ts`     | `OwnBattleStats`, `StatPoint`, `RangeKey`, `PlayerIdentity`, `/api/my-stats*`, `stat-sharing` and `faction-stats` responses |
+| `payouts.ts`      | Payout players, wars and `/api/payout-hits` responses                                                                       |
+| `torn.ts`         | Raw Torn API responses as tornintel reads them (`TornAttack`, `TornBasicProfile`, `TornRankedWar`, ...)                     |
+| `travel.ts`       | Member status, travel snapshots and estimates                                                                               |
+| `war-deals.ts`    | `CacheEstimate`, `DealDefaults`                                                                                             |
+| `war-hospital.ts` | `WarTarget`, `FactionMembersResponse`, `CombatBarsResponse`, chain target and enemy faction types                           |
 
 - Put a type here when more than one file uses it, when it is an API response (DTO), or when it describes a Torn or FF Scouter response. Props and small helper types used by a single file stay in that file.
 - API routes check their responses with `satisfies <Response type>` from here, and pages fetch with the same type, so a changed DTO fails type checking on both sides.

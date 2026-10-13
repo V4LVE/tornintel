@@ -7,11 +7,8 @@ import {
 } from '#/lib/battle-stats/my-stats'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
 import { recordSharedStats } from '#/lib/battle-stats/faction-sharing.server'
-import type { HistoricPersonalStat } from '#/lib/battle-stats/my-stats'
-
-type TornPersonalStatsResponse = {
-  personalstats?: HistoricPersonalStat[]
-}
+import type { StatHistoryResponse } from '#/models/my-stats'
+import type { TornPersonalStatsResponse } from '#/models/torn'
 
 // Past readings never change, so they can be reused for a day.
 const HISTORY_MAX_AGE_MS = 24 * 60 * 60 * 1000
@@ -62,10 +59,9 @@ export const Route = createFileRoute('/api/(my-stats)/my-stats-history')({
               },
             ])
           }
-          return Response.json(
-            { point },
-            { headers: { 'Cache-Control': 'no-store' } },
-          )
+          return Response.json({ point } satisfies StatHistoryResponse, {
+            headers: { 'Cache-Control': 'no-store' },
+          })
         } catch (error) {
           console.error('[tornintel] Stat history fetch failed', {
             message: error instanceof Error ? error.message : String(error),

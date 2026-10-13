@@ -3,13 +3,8 @@ import { fetchTorn } from '#/lib/torn/torn-api.server'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
 import { recordSharedStats } from '#/lib/battle-stats/faction-sharing.server'
 import { toStatPoint } from '#/lib/battle-stats/my-stats'
-import type { BattleStats } from '#/lib/battle-stats/my-stats'
-
-type TornMyStatsResponse = {
-  profile?: { id?: number; name?: string; level?: number }
-  battlestats?: BattleStats
-  error?: { code: number; error: string }
-}
+import type { MyStatsResponse } from '#/models/my-stats'
+import type { TornOwnStatsResponse } from '#/models/torn'
 
 export const Route = createFileRoute('/api/(my-stats)/my-stats')({
   server: {
@@ -29,7 +24,7 @@ export const Route = createFileRoute('/api/(my-stats)/my-stats')({
 
         try {
           const { data: payload, fetchedAt } =
-            await fetchTorn<TornMyStatsResponse>(url, { maxAgeMs: 30000 })
+            await fetchTorn<TornOwnStatsResponse>(url, { maxAgeMs: 30000 })
           const { profile, battlestats } = payload
           if (
             !profile?.id ||
@@ -58,7 +53,7 @@ export const Route = createFileRoute('/api/(my-stats)/my-stats')({
               },
               battlestats,
               fetchedAt,
-            },
+            } satisfies MyStatsResponse,
             { headers: { 'Cache-Control': 'no-store' } },
           )
         } catch (error) {

@@ -7,7 +7,7 @@ import {
 } from '#/lib/battle-stats/faction-sharing.server'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
 import { toStatPoint } from '#/lib/battle-stats/my-stats'
-import type { BattleStats } from '#/lib/battle-stats/my-stats'
+import type { OwnBattleStats, StatSharingResponse } from '#/models/my-stats'
 
 const noStore = { 'Cache-Control': 'no-store' }
 
@@ -42,7 +42,7 @@ export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
             {
               isSharing: await statSharingRepository.isSharing(identity.id),
               factionName: identity.factionName,
-            },
+            } satisfies StatSharingResponse,
             { headers: noStore },
           )
         } catch (requestError) {
@@ -66,7 +66,12 @@ export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
           const identity = await fetchPlayerIdentity(apiKey)
           if (!body.enabled) {
             await statSharingRepository.disable(identity.id)
-            return Response.json({ isSharing: false }, { headers: noStore })
+            return Response.json(
+              { isSharing: false } satisfies StatSharingResponse,
+              {
+                headers: noStore,
+              },
+            )
           }
           if (!identity.factionId) {
             return Response.json(
@@ -80,7 +85,7 @@ export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
           url.searchParams.set('selections', 'battlestats')
           url.searchParams.set('key', apiKey)
           const { data, fetchedAt } = await fetchTorn<{
-            battlestats?: BattleStats
+            battlestats?: OwnBattleStats
           }>(url, { maxAgeMs: 30000 })
           if (!data.battlestats || !Number.isFinite(data.battlestats.total)) {
             return Response.json(
@@ -103,7 +108,12 @@ export const Route = createFileRoute('/api/(my-stats)/stat-sharing')({
             ],
             identity,
           )
-          return Response.json({ isSharing: true }, { headers: noStore })
+          return Response.json(
+            { isSharing: true } satisfies StatSharingResponse,
+            {
+              headers: noStore,
+            },
+          )
         } catch (requestError) {
           console.error('[tornintel] Stat sharing update failed', {
             message:

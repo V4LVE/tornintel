@@ -1,34 +1,20 @@
-// The key owner's own battle stats: shared types and pure helpers used by the
-// /api/my-stats routes and the My stats page.
+// The key owner's own battle stats: pure helpers used by the /api/my-stats
+// routes and the My stats page. Types live in src/models/my-stats.ts.
 
-import type { FfScouterEstimate } from '#/models/ffscouter'
+import type {
+  OwnBattleStats,
+  RangeKey,
+  StatName,
+  StatPoint,
+} from '#/models/my-stats'
+import type { TornPersonalStat } from '#/models/torn'
 
-export const STAT_NAMES = ['strength', 'defense', 'speed', 'dexterity'] as const
-export type StatName = (typeof STAT_NAMES)[number]
-
-export type StatModifier = { effect: string; value: number; type: string }
-
-export type BattleStatDetail = {
-  value: number
-  modifier: number
-  modifiers: StatModifier[]
-}
-
-export type BattleStats = Record<StatName, BattleStatDetail> & {
-  total: number
-}
-
-/** A point-in-time reading of the four raw battle stats (timestamp in unix seconds). */
-export type StatPoint = Record<StatName, number> & {
-  timestamp: number
-  total: number
-}
-
-export type MyStatsResponse = {
-  profile: { id: number; name: string; level: number }
-  battlestats: BattleStats
-  fetchedAt: number
-}
+export const STAT_NAMES = [
+  'strength',
+  'defense',
+  'speed',
+  'dexterity',
+] as const satisfies readonly StatName[]
 
 export const STAT_META: Record<
   StatName,
@@ -69,22 +55,12 @@ const HISTORIC_STATS: Record<string, StatName | 'total'> = {
 }
 export const HISTORIC_STAT_QUERY = Object.keys(HISTORIC_STATS).join(',')
 
-/** One entry of Torn's v2 historical personalstats (timestamp in unix seconds). */
-export type HistoricPersonalStat = {
-  name: string
-  value: number
-  timestamp?: number
-}
-
-/** A reading with when Torn observed it (unix seconds), used to order readings within a day. */
-export type ObservedStatPoint = StatPoint & { observedAt: number }
-
 /**
  * Converts Torn's v2 personalstats list into a StatPoint.
  * Returns null when Torn has no record of all four stats at that time.
  */
 export function parsePersonalStats(
-  list: HistoricPersonalStat[] | undefined,
+  list: TornPersonalStat[] | undefined,
   timestamp: number,
 ): StatPoint | null {
   const point: Partial<StatPoint> = { timestamp }
@@ -103,7 +79,7 @@ export function parsePersonalStats(
  * when Torn sends no timestamps.
  */
 export function personalStatsObservedAt(
-  list: HistoricPersonalStat[] | undefined,
+  list: TornPersonalStat[] | undefined,
   requested: number,
 ): number {
   const recorded = (list ?? [])
@@ -117,7 +93,10 @@ export function personalStatsObservedAt(
   return Math.floor(Math.min(Math.max(...recorded), requested))
 }
 
-export function toStatPoint(stats: BattleStats, timestamp: number): StatPoint {
+export function toStatPoint(
+  stats: OwnBattleStats,
+  timestamp: number,
+): StatPoint {
   return {
     timestamp,
     strength: stats.strength.value,
@@ -179,8 +158,6 @@ export function describeBuild(point: StatPoint): BuildProfile {
   )
 }
 
-export type RangeKey = '7d' | '30d' | '90d' | '1y'
-
 export const RANGES: Record<
   RangeKey,
   { label: string; days: number; stepDays: number }
@@ -212,28 +189,6 @@ export function sampleTimestamps(
     result.push(today - offset * DAY + DAY - 1)
   }
   return result
-}
-
-export type FactionStatsMember = {
-  id: string
-  name: string
-  level: number
-  estimate: FfScouterEstimate | null
-  /** Present only when the member has opted in to share their real stats. */
-  shared: {
-    current: StatPoint
-    history: StatPoint[]
-    /** Milliseconds. */
-    updatedAt: number
-  } | null
-}
-
-export type FactionStatsResponse = {
-  faction: { id: string; name: string }
-  viewer: { id: string; isSharing: boolean }
-  members: FactionStatsMember[]
-  ffScouterReason?: string
-  sharingReason?: string
 }
 
 const compact = new Intl.NumberFormat('en-US', {

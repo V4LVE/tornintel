@@ -1,5 +1,6 @@
 // Raw Torn API response shapes, as tornintel reads them.
 
+import type { OwnBattleStats } from '#/models/my-stats'
 import type { MemberStatus } from '#/models/travel'
 
 // A v1 user profile; levelling routes read the editor's faction and target status.
@@ -63,6 +64,30 @@ export type TornFactionResponse = {
   tag: string
   members?: Record<string, TornFactionMember>
   error?: { error: string; code: number }
+}
+
+// A v1 faction as My stats reads it: the name and each member's name and level.
+export type TornFactionBasicResponse = {
+  name?: string
+  members?: Record<string, { name: string; level: number }>
+}
+
+// v2 user basic,battlestats for the key owner.
+export type TornOwnStatsResponse = {
+  profile?: { id?: number; name?: string; level?: number }
+  battlestats?: OwnBattleStats
+  error?: { code: number; error: string }
+}
+
+// One entry of v2 historical personalstats (timestamp in unix seconds).
+export type TornPersonalStat = {
+  name: string
+  value: number
+  timestamp?: number
+}
+
+export type TornPersonalStatsResponse = {
+  personalstats?: TornPersonalStat[]
 }
 
 export type TornBar = {

@@ -9,7 +9,7 @@ import {
   statSharingRepository,
 } from './faction-sharing.server'
 import { dayEnd } from './my-stats'
-import type { FactionStatsResponse } from './my-stats'
+import type { FactionStatsResponse } from '#/models/my-stats'
 
 let nextKey = 0
 const freshKey = () => `sharing-test-${++nextKey}`

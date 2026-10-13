@@ -5,8 +5,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { sharedStatSnapshots, statSharing } from '#/db/schema'
 import { statSharingRepository } from './faction-sharing.server'
-import type { PlayerIdentity } from './faction-sharing.server'
-import type { ObservedStatPoint } from './my-stats'
+import type { ObservedStatPoint, PlayerIdentity } from '#/models/my-stats'
 
 const reading = (total: number, observedAt: number): ObservedStatPoint => ({
   timestamp: 1700006399,

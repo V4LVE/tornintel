@@ -51,7 +51,7 @@ npm run db:migrate       # run migrations against DATABASE_URL
 
 | Route        | File            | Contents                                                                                                                      |
 | ------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `/`          | `index.tsx`     | War hospital: opposing members (hospital, ready, travel), chain tracker, energy, keep-alive chain target, TBS, theme toggle   |
+| `/`          | `index.tsx`     | War hospital: opposing members (hospital, ready, travel), chain tracker, energy, keep-alive chain target, TBS                 |
 | `/levelling` | `levelling.tsx` | Levelling targets in 10 tiers of 10 levels, Find 3 targets, TBS, FF Scouter estimates and new-player search, shared list      |
 | `/payouts`   | `payouts.tsx`   | Ranked war payout calculator (war and non-war hits × rate, capped at earnings)                                                |
 | `/war-deals` | `war-deals.tsx` | War deal proposals for both outcomes (compensation = losing score × rate, whole items plus a cash remainder)                  |

@@ -408,14 +408,6 @@ button {
 [data-status='active'] > .nav-icon {
   color: var(--c-f28b71);
 }
-.nav-count {
-  margin-left: auto;
-  color: var(--c-f58a71);
-  background: var(--c-392a2b);
-  padding: 2px 7px;
-  border-radius: 10px;
-  font-size: 11px;
-}
 .soon {
   margin-left: auto;
   color: var(--c-647581);
@@ -1728,7 +1720,6 @@ td {
   .nav-item.disabled {
     display: none;
   }
-  .nav-count,
   .soon {
     display: none;
   }

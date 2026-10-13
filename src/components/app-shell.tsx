@@ -134,8 +134,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <strong>{current.label}</strong>
           </div>
           <div className="top-actions">
-            <span className="connection">
-              <i /> Torn API connected
+            <span
+              className={
+                session.apiError ? 'connection unavailable' : 'connection'
+              }
+              title={session.apiError || undefined}
+            >
+              <i />{' '}
+              {session.apiError ? 'Torn API unavailable' : 'Torn API connected'}
             </span>
             <ThemeToggle />
           </div>

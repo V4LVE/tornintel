@@ -69,7 +69,7 @@ function Home() {
     null,
   )
   const [factionInput, setFactionInput] = useState('')
-  const { apiKey } = useSession()
+  const { apiKey, reportApiError } = useSession()
   const [isPaused, setIsPaused] = useState(false)
   const [hasInitialized, setHasInitialized] = useState(false)
   const [combatBars, setCombatBars] = useState<CombatBarsResponse | null>(null)
@@ -214,6 +214,7 @@ function Home() {
         setFactionInput(String(payload.faction.id))
         setSynced('Just now')
         setClock(Date.now())
+        reportApiError('')
       } catch (requestError) {
         if (requestSignal.aborted) return
         const message =
@@ -225,6 +226,8 @@ function Home() {
           message,
         })
         setError(message)
+        // The top bar shows Torn as unavailable until a later poll succeeds.
+        reportApiError(message)
       } finally {
         if (targetRequest.current.controller === controller) {
           targetRequest.current = { id: '', controller: null }
@@ -232,8 +235,11 @@ function Home() {
         }
       }
     },
-    [apiKey, factionId],
+    [apiKey, factionId, reportApiError],
   )
+
+  // Only this page reports to the top bar, so its last failure must not outlive it.
+  useEffect(() => () => reportApiError(''), [reportApiError])
 
   useEffect(() => {
     // The old key stored every synced faction; only manual choices are kept now.

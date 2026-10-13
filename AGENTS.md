@@ -148,8 +148,8 @@ Every shared type and DTO, so the API route and the page use the same definition
 - `battle-stats-cell.tsx`: TBS display, shared by the dashboard and levelling.
 - `table-controls.tsx`: `TableToolbar` (filter tabs with counts and search), `SortHeader`, `TableEmpty` and `TablePagination`. Driven by `useTableView` from `src/lib/hooks/use-table-view.ts` (pure helpers in `src/lib/table-view/`). Every list table uses them inside a `.panel` (`.panel.table-panel` on standalone pages); new lists should too instead of building their own filtering or paging.
 - `theme-toggle.tsx`: the dark/light button and `themeBootScript`.
-- `session.tsx`: `SessionProvider` and `useSession()`: the verified Torn key and profile (`apiKey`, `user`, `connect`, `disconnect`). Pages read the key from here instead of verifying it themselves.
-- `app-shell.tsx`: `AppShell` (API key gate, sidebar, top bar with breadcrumb) and `PageHeading` (eyebrow, title, description) for the top of each page. The sidebar is configured in `NAV_SECTIONS`: **Faction** for faction-wide tools and **Personal** for the viewer's own tools. A new page gets a nav entry there and starts with `PageHeading`; items without a `link` show as "Soon".
+- `session.tsx`: `SessionProvider` and `useSession()`: the verified Torn key and profile (`apiKey`, `user`, `connect`, `disconnect`), and `apiError`/`reportApiError` for the top bar's connection status (the war hospital reports each poll). Pages read the key from here instead of verifying it themselves.
+- `app-shell.tsx`: `AppShell` (API key gate, sidebar, top bar with breadcrumb, Torn connection status and theme toggle) and `PageHeading` (eyebrow, title, description) for the top of each page. The sidebar is configured in `NAV_SECTIONS`: **Faction** for faction-wide tools and **Personal** for the viewer's own tools. A new page gets a nav entry there and starts with `PageHeading`; items without a `link` show as "Soon".
 
 ### Database (`src/db/schema.ts`, migrations in `drizzle/`)
 

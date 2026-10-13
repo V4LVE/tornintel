@@ -18,6 +18,9 @@ export type Session = {
   user: UserProfile | null
   isVerifying: boolean
   error: string
+  // The last Torn request failure a page reported; empty while requests work.
+  apiError: string
+  reportApiError: (message: string) => void
   connect: (key: string) => Promise<boolean>
   disconnect: () => void
 }
@@ -31,6 +34,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState('')
+  const [apiError, setApiError] = useState('')
 
   const connect = useCallback(async (key: string) => {
     const requestedApiKey = key.trim()
@@ -45,6 +49,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem(API_KEY_STORAGE, requestedApiKey)
       setApiKey(requestedApiKey)
       setUser(verifiedUser)
+      setApiError('')
       setStatus('ready')
       return true
     } catch (requestError) {
@@ -66,6 +71,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setApiKey('')
     setUser(null)
     setError('')
+    setApiError('')
     setStatus('signed-out')
   }, [])
 
@@ -77,7 +83,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   return (
     <SessionContext.Provider
-      value={{ status, apiKey, user, isVerifying, error, connect, disconnect }}
+      value={{
+        status,
+        apiKey,
+        user,
+        isVerifying,
+        error,
+        apiError,
+        reportApiError: setApiError,
+        connect,
+        disconnect,
+      }}
     >
       {children}
     </SessionContext.Provider>

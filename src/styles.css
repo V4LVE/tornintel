@@ -501,6 +501,12 @@ button {
   align-items: center;
   gap: 7px;
 }
+.connection.unavailable {
+  color: var(--c-ef8167);
+}
+.connection.unavailable i {
+  background: var(--c-ef8167);
+}
 .connection i,
 .live-dot {
   display: inline-block;

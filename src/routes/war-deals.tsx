@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeading } from '#/components/app-shell'
+import { useSession } from '#/components/session'
 import {
   generateDealMessage,
   money,
@@ -15,6 +16,7 @@ export const Route = createFileRoute('/war-deals')({
 })
 
 function WarDeals() {
+  const { apiKey } = useSession()
   const [ourName, setOurName] = useState('NPC')
   const [theirName, setTheirName] = useState('Your faction')
   const [ourScore, setOurScore] = useState(8500)
@@ -42,14 +44,13 @@ function WarDeals() {
       setLoading(true)
       setLoadError('')
       try {
-        const key = localStorage.getItem('tornintel.apiKey') ?? ''
-        if (!key)
+        if (!apiKey)
           throw new Error(
             'Connect a Torn API key in Settings to automatically load war details, rewards, and prices. You can also fill in values manually.',
           )
         const response = await fetch(
           `/api/war-deal-defaults${opponent ? `?opponentId=${encodeURIComponent(opponent)}` : ''}`,
-          { headers: { 'X-Torn-Api-Key': key }, signal },
+          { cache: 'no-store', headers: { 'X-Torn-Api-Key': apiKey }, signal },
         )
         const data = (await response.json()) as DealDefaults & {
           error?: string
@@ -81,7 +82,7 @@ function WarDeals() {
         if (!signal?.aborted) setLoading(false)
       }
     },
-    [],
+    [apiKey],
   )
   useEffect(() => {
     const controller = new AbortController()

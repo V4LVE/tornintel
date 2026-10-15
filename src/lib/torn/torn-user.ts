@@ -1,8 +1,12 @@
 import type { UserProfile, UserResponse } from '#/models/account'
 
-export async function verifyTornUser(apiKey: string): Promise<UserProfile> {
+export async function verifyTornUser(
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<UserProfile> {
   const response = await fetch('/api/user', {
     cache: 'no-store',
+    signal,
     headers: { 'X-Torn-Api-Key': apiKey },
   })
   const payload = (await response.json()) as UserResponse

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeading } from '#/components/app-shell'
+import { useSession } from '#/components/session'
 import {
   SortHeader,
   TableEmpty,
@@ -19,6 +20,7 @@ import type {
 export const Route = createFileRoute('/payouts')({ component: Payouts })
 
 function Payouts() {
+  const { apiKey } = useSession()
   const [players, setPlayers] = useState<PayoutPlayer[]>([])
   const [wars, setWars] = useState<PayoutWar[]>([])
   const [warId, setWarId] = useState('')
@@ -29,14 +31,13 @@ function Payouts() {
   const [paid, setPaid] = useState<string[]>([])
   const [error, setError] = useState('')
   useEffect(() => {
-    const key = localStorage.getItem('tornintel.apiKey') ?? ''
     setPaid(readPaidPayouts())
     const controller = new AbortController()
     async function loadWars() {
       try {
         const data = await fetchPayoutData<PayoutWarsResponse>(
           '/api/payout-hits',
-          key,
+          apiKey,
           controller.signal,
         )
         if (controller.signal.aborted) return
@@ -48,17 +49,16 @@ function Payouts() {
     }
     void loadWars()
     return () => controller.abort()
-  }, [])
+  }, [apiKey])
   useEffect(() => {
     setPlayers([])
     if (!/^\d+$/.test(warId.trim())) return
-    const key = localStorage.getItem('tornintel.apiKey') ?? ''
     const controller = new AbortController()
     async function loadPlayers() {
       try {
         const data = await fetchPayoutData<PayoutPlayersResponse>(
           `/api/payout-hits?warId=${encodeURIComponent(warId.trim())}`,
-          key,
+          apiKey,
           controller.signal,
         )
         if (controller.signal.aborted) return
@@ -73,7 +73,7 @@ function Payouts() {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [warId])
+  }, [apiKey, warId])
   const calculation = useMemo(
     () => calculatePayouts(players, earnings, rate, outsideRate, includeNonWar),
     [players, earnings, rate, outsideRate, includeNonWar],

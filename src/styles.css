@@ -2719,7 +2719,7 @@ td {
   outline: 2px solid var(--c-f28b71);
   outline-offset: 2px;
 }
-@media (max-width: 800px) {
+@media (max-width: 1000px), (hover: none) and (pointer: coarse) {
   .app-shell {
     display: block;
   }

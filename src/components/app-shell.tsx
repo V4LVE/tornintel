@@ -63,15 +63,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!menuOpen || !session.user) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const desktop = window.matchMedia('(min-width: 801px)')
+    const mobileNavigation = window.matchMedia(
+      '(max-width: 1000px), (hover: none) and (pointer: coarse)',
+    )
     const closeOnDesktop = () => {
-      if (desktop.matches) menuRef.current?.close()
+      if (!mobileNavigation.matches) menuRef.current?.close()
     }
-    desktop.addEventListener('change', closeOnDesktop)
+    mobileNavigation.addEventListener('change', closeOnDesktop)
     closeOnDesktop()
     return () => {
       document.body.style.overflow = previousOverflow
-      desktop.removeEventListener('change', closeOnDesktop)
+      mobileNavigation.removeEventListener('change', closeOnDesktop)
     }
   }, [menuOpen, session.user])
 

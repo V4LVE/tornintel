@@ -456,6 +456,7 @@ button {
   color: var(--c-768794);
 }
 .content {
+  min-width: 0;
   width: calc(100% - 238px);
   max-width: 1480px;
   padding: 0 44px 30px;
@@ -1012,6 +1013,7 @@ button {
   background: transparent;
 }
 .table-wrap {
+  position: relative;
   overflow-x: auto;
 }
 table {
@@ -1656,57 +1658,12 @@ td {
   }
 }
 @media (max-width: 700px) {
-  .app-shell {
-    display: block;
-  }
-  .sidebar {
-    position: static;
-    width: 100%;
-    height: auto;
-    overflow-y: visible;
-    padding: 15px 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--c-25313b);
-  }
-  .brand {
-    padding: 0 7px 15px;
-  }
-  .workspace-label,
-  .sidebar-bottom {
-    display: none;
-  }
-  .nav-list {
-    display: flex;
-    overflow-x: auto;
-    gap: 4px;
-  }
-  .nav-item {
-    white-space: nowrap;
-    padding: 9px 10px;
-  }
-  .nav-item[data-status='active'] {
-    box-shadow: inset 0 -2px var(--c-f26b4f);
-  }
-  .nav-section + .nav-section {
-    margin-top: 4px;
-  }
-  .nav-item.disabled {
-    display: none;
-  }
-  .soon {
-    display: none;
-  }
   .content {
     width: 100%;
     padding: 0 14px 25px;
   }
   .topbar {
     height: 58px;
-  }
-  .connection,
-  .icon-button,
-  .help-button {
-    display: none;
   }
   .page-heading {
     align-items: flex-start;
@@ -2667,5 +2624,399 @@ td {
     align-items: flex-start;
     flex-direction: column;
     gap: 14px;
+  }
+}
+
+/* Full navigation stays available in a modal drawer on smaller screens. */
+.mobile-menu-toggle {
+  display: none;
+}
+.mobile-menu {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(320px, calc(100% - 36px));
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--c-293741);
+  background: var(--c-111c25);
+  color: var(--c-f0f4f8);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mobile-menu::backdrop {
+  background: color-mix(in srgb, var(--c-0d151d) 75%, transparent);
+}
+.mobile-menu-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: max(12px, env(safe-area-inset-top)) 14px
+    max(24px, env(safe-area-inset-bottom));
+}
+.mobile-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-left: 13px;
+}
+.mobile-menu-heading h2 {
+  margin: 0;
+  color: var(--c-9aaab6);
+  font-size: 12px;
+}
+.mobile-menu-close,
+.mobile-menu-toggle {
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  padding: 10px;
+  border: 1px solid var(--c-293741);
+  border-radius: 6px;
+  background: var(--c-111c25);
+  color: var(--c-f0f4f8);
+}
+.mobile-menu-close {
+  display: flex;
+  font-size: 24px;
+}
+.mobile-menu-icon {
+  display: grid;
+  width: 20px;
+  gap: 5px;
+}
+.mobile-menu-icon > span {
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.mobile-menu .nav-item {
+  min-height: 44px;
+}
+.mobile-menu .brand {
+  padding-left: 13px;
+  padding-bottom: 30px;
+}
+.mobile-menu .sidebar-bottom {
+  padding-top: 28px;
+}
+.mobile-menu .profile div:nth-child(2) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mobile-menu .avatar {
+  flex-shrink: 0;
+}
+.mobile-menu-toggle:focus-visible,
+.mobile-menu-close:focus-visible,
+.mobile-menu a:focus-visible {
+  outline: 2px solid var(--c-f28b71);
+  outline-offset: 2px;
+}
+@media (max-width: 800px) {
+  .app-shell {
+    display: block;
+  }
+  .sidebar {
+    display: none;
+  }
+  .content {
+    width: 100%;
+    padding: 0 20px 25px;
+  }
+  .topbar {
+    gap: 12px;
+    min-height: 66px;
+    height: auto;
+    padding: 10px 0;
+  }
+  .mobile-menu-toggle {
+    display: flex;
+  }
+  .breadcrumb {
+    min-width: 0;
+    margin-right: auto;
+    gap: 8px;
+  }
+  .breadcrumb strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .top-actions {
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .icon-button {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+  }
+  .page-heading {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+  .page-heading > div {
+    min-width: 0;
+  }
+  .page-heading p {
+    max-width: none;
+    line-height: 1.6;
+  }
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .panel-header > div {
+    min-width: 0;
+  }
+  .panel-header p,
+  .settings-error,
+  .settings-note,
+  .deal-note,
+  .levelling-note {
+    overflow-wrap: anywhere;
+  }
+  .table-toolbar {
+    display: block;
+  }
+  .table-toolbar-actions {
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+  .table-search {
+    width: 100%;
+    min-width: 0;
+  }
+  .table-search input {
+    min-width: 0;
+  }
+  .table-tab {
+    flex-shrink: 0;
+    min-height: 44px;
+  }
+  .table-footer {
+    align-items: flex-start;
+  }
+  .table-pager {
+    flex-wrap: wrap;
+    gap: 12px;
+    max-width: 100%;
+  }
+  .pagination {
+    flex-wrap: wrap;
+  }
+  .pagination button {
+    min-width: 36px;
+    height: 44px;
+    font-size: 12px;
+  }
+  .panel .table-page-size select {
+    height: 44px;
+    font-size: 16px;
+  }
+  .table-sort {
+    min-height: 44px;
+  }
+  .table-wrap,
+  .deal-table-wrap {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+  }
+  .payout-inputs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .payout-inputs label {
+    min-width: 0;
+  }
+  .payout-inputs input,
+  .payout-inputs select {
+    width: 100%;
+  }
+  .payout-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .payout-summary span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .api-key-settings {
+    flex-wrap: wrap;
+  }
+  .api-key-settings input {
+    min-width: 0;
+    flex: 1;
+  }
+  .deal-message-actions {
+    align-items: center;
+  }
+  .deal-messages {
+    grid-template-columns: 1fr;
+  }
+  .deal-message textarea {
+    min-height: 380px;
+  }
+  .share-toggle {
+    min-height: 44px;
+    white-space: normal;
+  }
+  .share-toggle > span {
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 700px) {
+  .content {
+    padding: 0 14px 25px;
+  }
+  .breadcrumb > span,
+  .breadcrumb > b {
+    display: none;
+  }
+  .connection {
+    display: flex;
+    font-size: 0;
+    gap: 0;
+  }
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sync-block {
+    align-self: flex-start;
+    grid-template-columns: auto auto;
+    gap: 8px 16px;
+  }
+  .sync-block .refresh-button,
+  .sync-block .pause-button {
+    grid-column: auto;
+    margin: 0;
+  }
+  .faction-picker {
+    gap: 10px;
+  }
+  .stat-card {
+    min-width: 0;
+    gap: 9px;
+  }
+  .stat-card > div:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .stat-icon {
+    flex-shrink: 0;
+  }
+  .panel-header h2,
+  .combat-heading h2 {
+    overflow-wrap: anywhere;
+  }
+  .table-footer {
+    gap: 14px;
+  }
+  .table-pager {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .table-search-clear {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .payout-inputs {
+    grid-template-columns: 1fr;
+  }
+  .payout-include-outside,
+  .levelling-ffscouter label,
+  .my-stats-ffscouter {
+    min-height: 44px;
+  }
+  .deal-panel {
+    padding: 20px 16px;
+  }
+  .deal-message-actions > button {
+    flex: 1;
+  }
+  .levelling-tiers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .levelling-card dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .levelling-card {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .my-stats-controls {
+    min-width: 0;
+    max-width: 100%;
+    gap: 12px;
+  }
+  .my-stats-controls .table-tabs {
+    height: 44px;
+    max-width: 100%;
+  }
+  .my-stats-balance {
+    padding: 0 16px 20px;
+  }
+  .my-stats-balance-labels {
+    flex-wrap: wrap;
+  }
+  .my-stats-tooltip {
+    max-width: calc(100% - 16px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .connected-user {
+    padding: 0 16px 20px;
+  }
+  .connected-user > div:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .app-shell input:not([type='checkbox']):not([type='radio']),
+  .app-shell select,
+  .app-shell textarea,
+  .landing-form input {
+    font-size: 16px;
+  }
+  .app-shell input:not([type='checkbox']):not([type='radio']),
+  .app-shell select {
+    min-height: 44px;
+  }
+  .app-shell .table-search input {
+    min-height: 28px;
+  }
+  .app-shell .add-button,
+  .app-shell .text-button,
+  .app-shell .attack-button,
+  .app-shell .refresh-button,
+  .app-shell .pause-button,
+  .app-shell .faction-picker button {
+    min-height: 44px;
+  }
+  .landing-header nav {
+    gap: 12px;
+  }
+  .landing-header nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .landing-header nav a:first-child {
+    display: none;
+  }
+  .landing-key-link,
+  .landing-text-link {
+    min-height: 44px;
   }
 }

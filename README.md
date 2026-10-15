@@ -2,7 +2,7 @@
 
 Torn faction tools built with TanStack Start. The main page tracks an opposing faction's hospital status, your faction's chain, and your energy. The payouts page calculates ranked war payouts, and Settings manages the API key stored in this browser.
 
-Every page shares one layout: a sidebar split into **Faction** tools (war hospital, target list, war payout, war deals) and **Personal** tools (levelling targets and My stats), plus a top bar. Before connecting, visitors see a responsive landing page with an overview of all six tools, an illustrative war-room preview, and a Torn API key form. Connecting a Torn API key once unlocks every page and keeps the requested destination. The landing page explains key storage, default faction stat sharing and optional FF Scouter access.
+Every page shares one layout: a sidebar split into **Faction** tools (war hospital, target list, war payout, war deals) and **Personal** tools (levelling targets and My stats), plus a top bar. Before connecting, visitors see a responsive landing page with an overview of all six tools, an illustrative war-room preview, and a Torn API key form. Connecting a Torn API key once unlocks every page and keeps the requested destination. At widths up to 800px, a hamburger button opens the complete navigation (including Settings and the profile) in a modal drawer; selecting a link, tapping outside, pressing Escape, or returning to desktop width closes it. Mobile layouts stack forms, keep wide tables inside horizontal scroll areas, and provide larger touch controls. The theme toggle remains available on mobile. The landing page explains key storage, default faction stat sharing and optional FF Scouter access.
 
 ## Run locally
 

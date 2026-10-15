@@ -1,21 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTorn } from '#/lib/torn/torn-api.server'
-
-type Player = { id: string; name: string; warHits: number; nonWarHits: number }
-type Attack = {
-  attacker?: { id?: number; name?: string }
-  is_ranked_war?: boolean
-}
-type RankedReport = {
-  rankedwarreport?: {
-    start?: number
-    end?: number
-    factions?: Array<{
-      id?: number
-      members?: Record<string, { name?: string; attacks?: number }>
-    }>
-  }
-}
+import type {
+  PayoutPlayer,
+  PayoutPlayersResponse,
+  PayoutWarsResponse,
+} from '#/models/payouts'
+import type {
+  TornFactionAttack,
+  TornRankedWarMembersReport,
+} from '#/models/torn'
 
 export const Route = createFileRoute('/api/(payouts)/payout-hits')({
   server: {
@@ -38,7 +31,7 @@ export const Route = createFileRoute('/api/(payouts)/payout-hits')({
             }
             return Response.json({
               wars: (history.rankedwars ?? []).slice(0, 3),
-            })
+            } satisfies PayoutWarsResponse)
           }
           if (!/^\d+$/.test(warId))
             return Response.json({ error: 'Invalid war ID.' }, { status: 400 })
@@ -46,7 +39,7 @@ export const Route = createFileRoute('/api/(payouts)/payout-hits')({
             torn(
               `/v2/faction/${warId}/rankedwarreport`,
               key,
-            ) as Promise<RankedReport>,
+            ) as Promise<TornRankedWarMembersReport>,
             tornV1Account(key),
           ])
           const war = report.rankedwarreport
@@ -58,7 +51,7 @@ export const Route = createFileRoute('/api/(payouts)/payout-hits')({
             throw new Error(
               'Could not identify your faction in this war report.',
             )
-          const players = new Map<string, Player>()
+          const players = new Map<string, PayoutPlayer>()
           for (const [id, member] of Object.entries(own.members ?? {}))
             players.set(id, {
               id,
@@ -69,7 +62,7 @@ export const Route = createFileRoute('/api/(payouts)/payout-hits')({
           const attacks = (await torn(
             `/v2/faction/attacks?limit=100&from=${war.start ?? 0}&to=${war.end ?? Math.floor(Date.now() / 1000)}`,
             key,
-          )) as { attacks?: Attack[] }
+          )) as { attacks?: TornFactionAttack[] }
           for (const attack of attacks.attacks ?? []) {
             if (!attack.attacker?.id || attack.is_ranked_war) continue
             const id = String(attack.attacker.id)
@@ -80,7 +73,7 @@ export const Route = createFileRoute('/api/(payouts)/payout-hits')({
           return Response.json({
             war: { id: warId },
             players: [...players.values()],
-          })
+          } satisfies PayoutPlayersResponse)
         } catch (error) {
           return Response.json(
             {

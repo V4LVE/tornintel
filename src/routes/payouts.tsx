@@ -1,14 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { PageHeading } from '#/components/app-shell'
+import {
+  SortHeader,
+  TableEmpty,
+  TablePagination,
+  TableToolbar,
+} from '#/components/table-controls'
+import { useTableView } from '#/lib/hooks/use-table-view'
+import type {
+  PayoutPlayer,
+  PayoutPlayersResponse,
+  PayoutWar,
+  PayoutWarsResponse,
+} from '#/models/payouts'
 
 export const Route = createFileRoute('/payouts')({ component: Payouts })
 
-type Player = { id: string; name: string; warHits: number; nonWarHits: number }
-type War = { id: number; start: number; end: number }
-
 function Payouts() {
-  const [players, setPlayers] = useState<Player[]>([])
-  const [wars, setWars] = useState<War[]>([])
+  const [players, setPlayers] = useState<PayoutPlayer[]>([])
+  const [wars, setWars] = useState<PayoutWar[]>([])
   const [warId, setWarId] = useState('')
   const [includeNonWar, setIncludeNonWar] = useState(true)
   const [earnings, setEarnings] = useState(0)
@@ -21,13 +32,13 @@ function Payouts() {
     const controller = new AbortController()
     async function loadWars() {
       try {
-        const data = await fetchPayoutData<{ wars?: War[] }>(
+        const data = await fetchPayoutData<PayoutWarsResponse>(
           '/api/payout-hits',
           key,
           controller.signal,
         )
-        setWars(data.wars ?? [])
-        setWarId((current) => current || String(data.wars?.[0]?.id ?? ''))
+        setWars(data.wars)
+        setWarId((current) => current || String(data.wars[0]?.id ?? ''))
       } catch (requestError) {
         if (!controller.signal.aborted) setError(errorMessage(requestError))
       }
@@ -42,13 +53,13 @@ function Payouts() {
     const controller = new AbortController()
     async function loadPlayers() {
       try {
-        const data = await fetchPayoutData<{ players?: Player[] }>(
+        const data = await fetchPayoutData<PayoutPlayersResponse>(
           `/api/payout-hits?warId=${encodeURIComponent(warId.trim())}`,
           key,
           controller.signal,
         )
         setError('')
-        setPlayers(data.players ?? [])
+        setPlayers(data.players)
       } catch (requestError) {
         if (!controller.signal.aborted) setError(errorMessage(requestError))
       }
@@ -76,6 +87,24 @@ function Payouts() {
       })),
     [appliedRate, includeNonWar, players],
   )
+  const payoutView = useTableView(payouts, {
+    search: (player) => [player.name, player.id],
+    filters: [
+      { id: 'all', label: 'All players' },
+      {
+        id: 'unpaid',
+        label: 'Unpaid',
+        test: (player) => !paid.includes(player.id) && player.amount > 0,
+      },
+      { id: 'paid', label: 'Paid', test: (player) => paid.includes(player.id) },
+    ],
+    sorts: {
+      player: (player) => player.name,
+      warHits: (player) => player.warHits,
+      nonWarHits: (player) => player.nonWarHits,
+      payout: (player) => player.amount,
+    },
+  })
   const totalPaid = payouts.reduce((sum, player) => sum + player.amount, 0)
   const remainder = Math.max(0, earnings - totalPaid)
   function markPaid(player: (typeof payouts)[number]) {
@@ -90,15 +119,11 @@ function Payouts() {
     localStorage.setItem('tornintel.paidPayouts', JSON.stringify(next))
   }
   return (
-    <main className="payout-page">
-      <a href="/" className="back-link">
-        ← War hospital
-      </a>
-      <h1>War payout</h1>
-      <p>
+    <section className="payout-page">
+      <PageHeading eyebrow="RANKED WAR" title="War payout">
         Select a ranked war. Non-war hits are attacks during that war against
         targets outside the opposing faction.
-      </p>
+      </PageHeading>
       <div className="payout-inputs">
         <label>
           Ranked war
@@ -165,38 +190,55 @@ function Payouts() {
       {error ? (
         <p className="settings-error">{error}</p>
       ) : (
-        <table className="payout-table">
-          <thead>
-            <tr>
-              <th>PLAYER</th>
-              <th>WAR HITS</th>
-              <th>NON-WAR HITS</th>
-              <th>PAYOUT</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {payouts.map((player) => (
-              <tr key={player.id}>
-                <td>{player.name}</td>
-                <td>{player.warHits}</td>
-                <td>{player.nonWarHits}</td>
-                <td>{money(player.amount)}</td>
-                <td>
-                  <button
-                    disabled={paid.includes(player.id) || player.amount <= 0}
-                    onClick={() => markPaid(player)}
-                    className="add-button"
-                  >
-                    {paid.includes(player.id) ? 'Paid' : 'Add to balance'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <section className="panel table-panel">
+          <TableToolbar view={payoutView} />
+          <div className="table-wrap">
+            <table className="payout-table">
+              <thead>
+                <tr>
+                  <SortHeader view={payoutView} column="player">
+                    PLAYER
+                  </SortHeader>
+                  <SortHeader view={payoutView} column="warHits">
+                    WAR HITS
+                  </SortHeader>
+                  <SortHeader view={payoutView} column="nonWarHits">
+                    NON-WAR HITS
+                  </SortHeader>
+                  <SortHeader view={payoutView} column="payout">
+                    PAYOUT
+                  </SortHeader>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {payoutView.pageItems.map((player) => (
+                  <tr key={player.id}>
+                    <td>{player.name}</td>
+                    <td>{player.warHits}</td>
+                    <td>{player.nonWarHits}</td>
+                    <td>{money(player.amount)}</td>
+                    <td>
+                      <button
+                        disabled={
+                          paid.includes(player.id) || player.amount <= 0
+                        }
+                        onClick={() => markPaid(player)}
+                        className="add-button"
+                      >
+                        {paid.includes(player.id) ? 'Paid' : 'Add to balance'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <TableEmpty view={payoutView} noun="players" />
+          <TablePagination view={payoutView} noun="players" />
+        </section>
       )}
-    </main>
+    </section>
   )
 }
 function money(value: number) {

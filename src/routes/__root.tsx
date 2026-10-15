@@ -1,7 +1,15 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+import {
+  HeadContent,
+  Link,
+  Outlet,
+  Scripts,
+  createRootRoute,
+} from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
+import { AppShell } from '../components/app-shell'
+import { SessionProvider } from '../components/session'
 import { themeBootScript } from '../components/theme-toggle'
 import appCss from '../styles.css?url'
 
@@ -29,24 +37,31 @@ export const Route = createRootRoute({
     ],
   }),
   shellComponent: RootDocument,
+  component: RootLayout,
   notFoundComponent: NotFound,
 })
 
+// Every page renders inside the same sidebar layout, so navigating between
+// tools never leaves the app.
+function RootLayout() {
+  return (
+    <SessionProvider>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </SessionProvider>
+  )
+}
+
 function NotFound() {
   return (
-    <main className="api-key-gate">
-      <section className="api-key-card">
-        <div className="brand">
-          <span className="brand-mark">TI</span>
-          <span>tornintel</span>
-        </div>
-        <h1>Page not found</h1>
-        <p>This page does not exist or has moved.</p>
-        <a className="back-link" href="/">
-          ← Back to war hospital
-        </a>
-      </section>
-    </main>
+    <section className="not-found">
+      <h1>Page not found</h1>
+      <p>This page does not exist or has moved.</p>
+      <Link className="back-link" to="/">
+        ← Back to war hospital
+      </Link>
+    </section>
   )
 }
 

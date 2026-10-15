@@ -1,4 +1,11 @@
-import type { CacheEstimate } from './war-deal'
+// War deal calculator data from /api/war-deal-defaults.
+
+export type CacheEstimate = {
+  name: string
+  ours: number
+  theirs: number
+  price: number
+}
 
 export type DealDefaults = {
   ourFaction: { id: number; name: string }

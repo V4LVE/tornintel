@@ -1,13 +1,13 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { PageHeading } from '#/components/app-shell'
 import {
   generateDealMessage,
   money,
   number,
   summarizeDeal,
 } from '#/lib/war-deals/war-deal'
-import type { CacheEstimate } from '#/lib/war-deals/war-deal'
-import type { DealDefaults } from '#/lib/war-deals/war-deal-data'
+import type { CacheEstimate, DealDefaults } from '#/models/war-deals'
 
 export const Route = createFileRoute('/war-deals')({
   component: WarDeals,
@@ -121,23 +121,11 @@ function WarDeals() {
   }
 
   return (
-    <main className="deal-page">
-      <nav className="deal-nav" aria-label="War tools">
-        <Link to="/" className="back-link">
-          ← War hospital
-        </Link>
-        <Link to="/payouts" className="back-link">
-          War payout →
-        </Link>
-      </nav>
-      <header className="settings-heading">
-        <span>WAR PLANNING</span>
-        <h1>War deal calculator</h1>
-        <p>
-          Plan scores, estimate the rewards, and prepare a proposal for either
-          outcome.
-        </p>
-      </header>
+    <section className="deal-page">
+      <PageHeading eyebrow="WAR PLANNING" title="War deal calculator">
+        Plan scores, estimate the rewards, and prepare a proposal for either
+        outcome.
+      </PageHeading>
 
       <section className="panel deal-panel" aria-label="Automatic Torn data">
         <div className="deal-message-actions">
@@ -465,7 +453,7 @@ function WarDeals() {
           />
         </div>
       </section>
-    </main>
+    </section>
   )
 }
 

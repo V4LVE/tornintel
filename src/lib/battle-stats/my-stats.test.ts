@@ -7,7 +7,7 @@ import {
   personalStatsObservedAt,
   sampleTimestamps,
 } from './my-stats'
-import type { StatPoint } from './my-stats'
+import type { StatPoint } from '#/models/my-stats'
 import { Route as HistoryRoute } from '../../routes/api/(my-stats)/my-stats-history'
 import { Route as MyStatsRoute } from '../../routes/api/(my-stats)/my-stats'
 

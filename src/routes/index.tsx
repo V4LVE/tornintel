@@ -1,16 +1,28 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
-import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
-import type { EnemyFactionSource } from '#/lib/war-hospital/enemy-faction.server'
-import type { TravelEstimate } from '#/lib/travel/travel'
-import { verifyTornUser } from '#/lib/torn/torn-user'
-import type { UserProfile } from '#/lib/torn/torn-user'
-import type { ChainTargetResponse } from '#/lib/war-hospital/chain-target'
 import { useVisiblePolling } from '#/lib/hooks/use-visible-polling'
-import { BattleStatsCell } from '#/components/battle-stats-cell'
-import { ThemeToggle } from '#/components/theme-toggle'
+import { useTableView } from '#/lib/hooks/use-table-view'
+import type { TableFilter } from '#/lib/hooks/use-table-view'
+import {
+  BattleStatsCell,
+  battleStatsSortValue,
+} from '#/components/battle-stats-cell'
+import {
+  SortHeader,
+  TableEmpty,
+  TablePagination,
+  TableToolbar,
+} from '#/components/table-controls'
+import { useSession } from '#/components/session'
+import type { TravelEstimate } from '#/models/travel'
+import type {
+  ChainTargetResponse,
+  CombatBarsResponse,
+  EnemyFactionSource,
+  FactionMembersResponse,
+  WarTarget,
+} from '#/models/war-hospital'
 
 const MANUAL_FACTION_KEY = 'tornintel.manualFactionId'
 const FACTION_SOURCE_LABELS: Record<EnemyFactionSource, string> = {
@@ -22,66 +34,24 @@ const FACTION_SOURCE_LABELS: Record<EnemyFactionSource, string> = {
 
 export const Route = createFileRoute('/')({ component: Home })
 
-type Target = {
-  id: string
-  name: string
-  level: number
-  status: 'Ready' | 'In hospital' | 'Traveling' | 'Abroad' | 'Unavailable'
-  detail: string
-  releaseAt: number
-  reason: string
-  lastSeen: string
-  hospitalRecommended: boolean
-  priority: 'High' | 'Medium' | 'Low'
-  battleStats: BattleStatsEstimate
-  battleStatContributors: BattleStatContributor[]
-  travel: TravelEstimate | null
+const TARGET_FILTERS: TableFilter<WarTarget, string>[] = [
+  { id: 'all', label: 'All targets' },
+  ...(['In hospital', 'Ready', 'Traveling', 'Abroad'] as const).map(
+    (status) => ({
+      id: status,
+      label: status,
+      test: (target: WarTarget) => target.status === status,
+    }),
+  ),
+]
+const PRIORITY_ORDER: Record<WarTarget['priority'], number> = {
+  High: 0,
+  Medium: 1,
+  Low: 2,
 }
-
-type FactionMembersResponse = {
-  faction: { id: number; name: string; tag: string; source: EnemyFactionSource }
-  members: Target[]
-  fairFightStatus: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
-  fairFightReason?: string
-  sharedTbsStatus: 'READY' | 'UNAVAILABLE'
-  sharedTbsReason?: string
-  travelTrackingReason?: string
-  statusObservedAt: number
-  fetchedAt: number
-  error?: string
-}
-
-type CombatBarsResponse = {
-  energy?: {
-    current: number
-    maximum: number
-    increment: number
-    interval: number
-    tick_time: number
-    full_time: number
-  }
-  chain?: {
-    current: number
-    max: number
-    timeout: number
-    cooldown: number
-  } | null
-  fetchedAt?: number
-  error?: string
-}
-
-const filters = [
-  'All targets',
-  'In hospital',
-  'Ready',
-  'Traveling',
-  'Abroad',
-] as const
 
 function Home() {
-  const [filter, setFilter] = useState<(typeof filters)[number]>('All targets')
-  const [query, setQuery] = useState('')
-  const [targets, setTargets] = useState<Target[]>([])
+  const [targets, setTargets] = useState<WarTarget[]>([])
   const [fairFightStatus, setFairFightStatus] = useState<
     FactionMembersResponse['fairFightStatus'] | null
   >(null)
@@ -99,12 +69,9 @@ function Home() {
     null,
   )
   const [factionInput, setFactionInput] = useState('')
-  const [apiKey, setApiKey] = useState('')
+  const { apiKey, reportApiError } = useSession()
   const [isPaused, setIsPaused] = useState(false)
   const [hasInitialized, setHasInitialized] = useState(false)
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [isAuthenticating, setIsAuthenticating] = useState(false)
-  const [authenticationError, setAuthenticationError] = useState('')
   const [combatBars, setCombatBars] = useState<CombatBarsResponse | null>(null)
   const [combatBarsError, setCombatBarsError] = useState('')
   const [chainTarget, setChainTarget] = useState<ChainTargetResponse | null>(
@@ -189,33 +156,6 @@ function Home() {
     [],
   )
 
-  const authenticate = useCallback(async (key: string) => {
-    const requestedApiKey = key.trim()
-    if (!requestedApiKey) {
-      setAuthenticationError('Enter a Torn API key to continue.')
-      return false
-    }
-
-    setIsAuthenticating(true)
-    setAuthenticationError('')
-    try {
-      const verifiedUser = await verifyTornUser(requestedApiKey)
-      window.localStorage.setItem('tornintel.apiKey', requestedApiKey)
-      setApiKey(requestedApiKey)
-      setUser(verifiedUser)
-      return true
-    } catch (requestError) {
-      setAuthenticationError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Unable to verify your Torn public API key.',
-      )
-      return false
-    } finally {
-      setIsAuthenticating(false)
-    }
-  }, [])
-
   const refreshTargets = useCallback(
     async (
       idOverride = factionId,
@@ -274,6 +214,7 @@ function Home() {
         setFactionInput(String(payload.faction.id))
         setSynced('Just now')
         setClock(Date.now())
+        reportApiError('')
       } catch (requestError) {
         if (requestSignal.aborted) return
         const message =
@@ -285,6 +226,8 @@ function Home() {
           message,
         })
         setError(message)
+        // The top bar shows Torn as unavailable until a later poll succeeds.
+        reportApiError(message)
       } finally {
         if (targetRequest.current.controller === controller) {
           targetRequest.current = { id: '', controller: null }
@@ -292,8 +235,11 @@ function Home() {
         }
       }
     },
-    [apiKey, factionId],
+    [apiKey, factionId, reportApiError],
   )
+
+  // Only this page reports to the top bar, so its last failure must not outlive it.
+  useEffect(() => () => reportApiError(''), [reportApiError])
 
   useEffect(() => {
     // The old key stored every synced faction; only manual choices are kept now.
@@ -303,13 +249,11 @@ function Home() {
       savedFactionId && /^\d{1,10}$/.test(savedFactionId) ? savedFactionId : ''
     setFactionId(initialFactionId)
     setFactionInput(initialFactionId)
-    const savedApiKey = window.localStorage.getItem('tornintel.apiKey') ?? ''
     setIsPaused(
       window.localStorage.getItem('tornintel.hospitalPaused') === 'true',
     )
     setHasInitialized(true)
-    if (savedApiKey) void authenticate(savedApiKey)
-  }, [authenticate])
+  }, [])
 
   const pollTargets = useCallback(
     (signal: AbortSignal) => refreshTargets(factionId, apiKey, signal),
@@ -319,11 +263,8 @@ function Home() {
     (signal: AbortSignal) => refreshCombatBars(apiKey, signal),
     [apiKey, refreshCombatBars],
   )
-  useVisiblePolling(
-    pollTargets,
-    Boolean(hasInitialized && apiKey && user && !isPaused),
-  )
-  useVisiblePolling(pollBars, Boolean(hasInitialized && apiKey && user))
+  useVisiblePolling(pollTargets, Boolean(hasInitialized && apiKey && !isPaused))
+  useVisiblePolling(pollBars, Boolean(hasInitialized && apiKey))
 
   useEffect(() => {
     function refreshAfterAttack() {
@@ -392,18 +333,25 @@ function Home() {
     )
   }
 
-  const visibleTargets = useMemo(
-    () =>
-      targets.filter((target) => {
-        const matchesFilter =
-          filter === 'All targets' || target.status === filter
-        const matchesQuery =
-          target.name.toLowerCase().includes(query.toLowerCase()) ||
-          target.id.includes(query)
-        return matchesFilter && matchesQuery
-      }),
-    [filter, query, targets],
-  )
+  const targetView = useTableView(targets, {
+    search: (target) => [target.name, target.id],
+    filters: TARGET_FILTERS,
+    sorts: {
+      member: (target) => target.name,
+      level: (target) => target.level,
+      // Time until the member can be hit: ready first, then hospital and landings.
+      release: (target) =>
+        target.status === 'Ready'
+          ? 0
+          : target.status === 'In hospital'
+            ? target.releaseAt
+            : target.status === 'Traveling'
+              ? target.travel?.latestArrivalAt
+              : null,
+      tbs: (target) => battleStatsSortValue(target.battleStats),
+      priority: (target) => PRIORITY_ORDER[target.priority],
+    },
+  })
 
   const hospitalTargets = useMemo(
     () =>
@@ -439,522 +387,356 @@ function Home() {
     chainTarget?.target && clock - chainTarget.fetchedAt < 30000,
   )
 
-  if (!hasInitialized || (isAuthenticating && !user)) {
-    return <ApiKeyGate isLoading />
-  }
-
-  if (!user) {
-    return (
-      <ApiKeyGate
-        error={authenticationError}
-        isLoading={isAuthenticating}
-        onSubmit={authenticate}
-      />
-    )
-  }
-
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">TI</span>
-          <span>tornintel</span>
-        </div>
-        <div className="workspace-label">OPERATIONS</div>
-        <nav className="nav-list">
-          <a className="nav-item active" href="#hospital">
-            <span className="nav-icon">+</span> War hospital
-            <span className="nav-count">{hospitalTargets.length}</span>
-          </a>
-          <a className="nav-item" href="#targets">
-            <span className="nav-icon">#</span> Target list
-          </a>
-          <a className="nav-item" href="/payouts">
-            <span className="nav-icon">$</span> War payout
-          </a>
-          <Link className="nav-item" to="/war-deals">
-            <span className="nav-icon">↔</span> War deals
-          </Link>
-          <Link className="nav-item" to="/levelling">
-            <span className="nav-icon">^</span> Levelling targets
-          </Link>
-          <Link className="nav-item" to="/my-stats">
-            <span className="nav-icon">↑</span> My stats
-          </Link>
-          <a className="nav-item" href="#intel">
-            <span className="nav-icon">i</span> Intel reports
-            <span className="soon">Soon</span>
-          </a>
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="workspace-label">WORKSPACE</div>
-          <a className="nav-item" href="/settings">
-            <span className="nav-icon">*</span> Settings
-          </a>
-          <div className="profile">
-            <div className="avatar">{user.name.charAt(0)}</div>
-            <div>
-              <strong>{user.name}</strong>
-              <span>
-                Level {user.level} · {user.factionName}
-              </span>
-            </div>
-            <span className="profile-more">...</span>
+    <section id="hospital">
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">
+            {factionName.toUpperCase()} <span className="live-dot" /> LIVE
+            MONITOR
           </div>
-        </div>
-      </aside>
-
-      <section className="content" id="hospital">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <span>Operations</span>
-            <b>/</b>
-            <strong>War hospital</strong>
-          </div>
-          <div className="top-actions">
-            <span className="connection">
-              <i /> {error ? 'Torn API unavailable' : 'Torn API connected'}
-            </span>
-            <ThemeToggle />
-            <button className="icon-button" aria-label="Notifications">
-              &#9678;
+          <h1>War hospital</h1>
+          <p>
+            Track opposing members and strike the moment they leave the
+            hospital.
+          </p>
+          <form className="faction-picker" onSubmit={trackFaction}>
+            <label htmlFor="faction-id">Track faction</label>
+            <input
+              id="faction-id"
+              inputMode="numeric"
+              value={factionInput}
+              onChange={(event) => setFactionInput(event.target.value)}
+              placeholder="Auto"
+            />
+            <button type="submit" disabled={isLoading}>
+              Track
             </button>
-            <button className="help-button">?</button>
-          </div>
-        </header>
-
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">
-              {factionName.toUpperCase()} <span className="live-dot" /> LIVE
-              MONITOR
-            </div>
-            <h1>War hospital</h1>
-            <p>
-              Track opposing members and strike the moment they leave the
-              hospital.
-            </p>
-            <form className="faction-picker" onSubmit={trackFaction}>
-              <label htmlFor="faction-id">Track faction</label>
-              <input
-                id="faction-id"
-                inputMode="numeric"
-                value={factionInput}
-                onChange={(event) => setFactionInput(event.target.value)}
-                placeholder="Auto"
-              />
-              <button type="submit" disabled={isLoading}>
-                Track
-              </button>
-              {factionId ? (
-                <button
-                  type="button"
-                  className="faction-auto"
-                  onClick={trackAutomatically}
-                  title="Track the opponent from your faction's ranked wars"
-                >
-                  Auto
-                </button>
-              ) : (
-                factionSource && (
-                  <span className="faction-source">
-                    {FACTION_SOURCE_LABELS[factionSource]}
-                  </span>
-                )
-              )}
-            </form>
-          </div>
-          <div className="sync-block">
-            <span>Last synced</span>
-            <strong>{synced}</strong>
-            <button
-              onClick={() => void refreshTargets()}
-              className="refresh-button"
-              disabled={isLoading || isPaused || !apiKey}
-            >
-              <span>&#8635;</span> {isLoading ? 'Refreshing' : 'Refresh'}
-            </button>
-            <button
-              onClick={togglePause}
-              className={isPaused ? 'pause-button paused' : 'pause-button'}
-              aria-pressed={isPaused}
-              title="Pause or resume War Hospital API polling"
-            >
-              <span aria-hidden="true">{isPaused ? '▶' : 'Ⅱ'}</span>
-              {isPaused
-                ? 'Resume hospital tracking'
-                : 'Pause hospital tracking'}
-            </button>
-          </div>
-        </div>
-
-        <div className="stat-grid">
-          <Stat
-            label="Total members"
-            value={String(targets.length)}
-            detail={factionName}
-            icon="/"
-            tone="blue"
-          />
-          <Stat
-            label="In hospital"
-            value={String(hospitalTargets.length)}
-            detail={String(hospitalExitsSoon) + ' out within 10 min'}
-            icon="+"
-            tone="orange"
-          />
-          <Stat
-            label="Ready to hit"
-            value={String(readyTargets.length)}
-            detail={String(onlineReadyTargets) + ' online right now'}
-            icon="!"
-            tone="green"
-          />
-          <Stat
-            label="Next release"
-            value={
-              nextRelease
-                ? formatRelease(nextRelease.releaseAt, clock)
-                : '--:--'
-            }
-            detail={
-              nextRelease
-                ? nextRelease.name + ' - level ' + String(nextRelease.level)
-                : 'No members hospitalized'
-            }
-            icon="~"
-            tone="purple"
-          />
-        </div>
-
-        <div className="combat-grid">
-          <section
-            className="panel combat-panel"
-            id="chain"
-            aria-label="Faction chain tracker"
-          >
-            <div className="combat-heading">
-              <div>
-                <span className="combat-kicker">YOUR FACTION</span>
-                <h2>Chain tracker</h2>
-              </div>
-              <span className="combat-indicator">
-                {activeChain ? 'Active' : 'Idle'}
-              </span>
-            </div>
-            {activeChain && combatBars?.chain ? (
-              <>
-                <div className="combat-value">
-                  {combatBars.chain.current.toLocaleString()} <span>hits</span>
-                </div>
-                <div className="combat-timers">
-                  <div>
-                    <span>Chain ends in</span>
-                    <strong>{formatCountdown(chainDeadline, clock)}</strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="combat-empty">
-                {combatBars
-                  ? 'No active chain'
-                  : combatBarsError
-                    ? 'Chain unavailable'
-                    : 'Loading chain…'}
-              </p>
-            )}
-            {combatBarsError && (
-              <p className="combat-error">{combatBarsError}</p>
-            )}
-            <div className="chain-keep-alive">
-              <h3>Keep the chain alive</h3>
-              <p>
-                Find a random available player you beat in the last 14 days.
-              </p>
+            {factionId ? (
               <button
-                className="refresh-button"
-                onClick={() => void findChainTarget()}
-                disabled={isFindingChainTarget}
+                type="button"
+                className="faction-auto"
+                onClick={trackAutomatically}
+                title="Track the opponent from your faction's ranked wars"
               >
-                {isFindingChainTarget
-                  ? 'Finding target…'
-                  : chainTarget?.target
-                    ? 'Find another target'
-                    : 'Find keep-alive target'}
+                Auto
               </button>
-              <div aria-live="polite" aria-busy={isFindingChainTarget}>
-                {chainTarget?.target && (
-                  <div className="chain-target">
-                    <strong>{chainTarget.target.name}</strong>
-                    <span>
-                      #{chainTarget.target.id} · Level{' '}
-                      {chainTarget.target.level}
-                    </span>
-                    <span>
-                      Last beaten{' '}
-                      {new Date(
-                        chainTarget.target.lastWonAt,
-                      ).toLocaleDateString()}
-                      . Previous wins suggest you can beat them again.
-                    </span>
-                    {chainTargetFresh &&
-                    (!energyNow || energyNow.current >= 25) ? (
-                      <a
-                        className="attack-button"
-                        href={
-                          'https://www.torn.com/page.php?sid=attack&user2ID=' +
-                          chainTarget.target.id
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={() => {
-                          setChainTarget(null)
-                          barsNeedRefresh.current = true
-                        }}
-                      >
-                        Attack <span>&#8599;</span>
-                      </a>
-                    ) : (
-                      <span>
-                        {!chainTargetFresh
-                          ? 'Status check expired. Find a fresh target.'
-                          : 'You need 25 energy to attack.'}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {chainTarget?.message && <p>{chainTarget.message}</p>}
-                {chainTargetError && (
-                  <p className="combat-error">{chainTargetError}</p>
-                )}
-              </div>
-            </div>
-          </section>
-          <section className="panel combat-panel" aria-label="Energy bar">
-            <div className="combat-heading">
-              <div>
-                <span className="combat-kicker">YOUR ENERGY</span>
-                <h2>Energy</h2>
-              </div>
-            </div>
-            {combatBars?.energy && energyNow ? (
-              <>
-                <div className="combat-value">
-                  {energyNow.current} <span>/ {combatBars.energy.maximum}</span>
-                </div>
-                <div
-                  className="energy-track"
-                  role="progressbar"
-                  aria-label="Energy"
-                  aria-valuenow={Math.min(
-                    energyNow.current,
-                    combatBars.energy.maximum,
-                  )}
-                  aria-valuemin={0}
-                  aria-valuemax={combatBars.energy.maximum}
-                >
-                  <div
-                    style={{
-                      width: `${Math.min(100, Math.max(0, (energyNow.current / combatBars.energy.maximum) * 100))}%`,
-                    }}
-                  />
-                </div>
-                <div className="combat-timers">
-                  <div>
-                    <span>Next refill</span>
-                    <strong>
-                      {energyNow.current >= combatBars.energy.maximum
-                        ? 'Full'
-                        : formatCountdown(energyNow.nextTickAt, clock)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Full refill</span>
-                    <strong>
-                      {energyNow.current >= combatBars.energy.maximum
-                        ? 'Full'
-                        : formatCountdown(
-                            combatBars.fetchedAt! +
-                              combatBars.energy.full_time * 1000,
-                            clock,
-                          )}
-                    </strong>
-                  </div>
-                </div>
-              </>
             ) : (
-              <p className="combat-empty">
-                {combatBarsError ? 'Energy unavailable' : 'Loading energy…'}
-              </p>
+              factionSource && (
+                <span className="faction-source">
+                  {FACTION_SOURCE_LABELS[factionSource]}
+                </span>
+              )
             )}
-            {combatBarsError && (
-              <p className="combat-error">{combatBarsError}</p>
-            )}
-          </section>
+          </form>
         </div>
+        <div className="sync-block">
+          <span>Last synced</span>
+          <strong>{synced}</strong>
+          <button
+            onClick={() => void refreshTargets()}
+            className="refresh-button"
+            disabled={isLoading || isPaused || !apiKey}
+          >
+            <span>&#8635;</span> {isLoading ? 'Refreshing' : 'Refresh'}
+          </button>
+          <button
+            onClick={togglePause}
+            className={isPaused ? 'pause-button paused' : 'pause-button'}
+            aria-pressed={isPaused}
+            title="Pause or resume War Hospital API polling"
+          >
+            <span aria-hidden="true">{isPaused ? '▶' : 'Ⅱ'}</span>
+            {isPaused ? 'Resume hospital tracking' : 'Pause hospital tracking'}
+          </button>
+        </div>
+      </div>
 
-        <section className="panel target-panel" id="targets">
-          <div className="panel-header">
+      <div className="stat-grid">
+        <Stat
+          label="Total members"
+          value={String(targets.length)}
+          detail={factionName}
+          icon="/"
+          tone="blue"
+        />
+        <Stat
+          label="In hospital"
+          value={String(hospitalTargets.length)}
+          detail={String(hospitalExitsSoon) + ' out within 10 min'}
+          icon="+"
+          tone="orange"
+        />
+        <Stat
+          label="Ready to hit"
+          value={String(readyTargets.length)}
+          detail={String(onlineReadyTargets) + ' online right now'}
+          icon="!"
+          tone="green"
+        />
+        <Stat
+          label="Next release"
+          value={
+            nextRelease ? formatRelease(nextRelease.releaseAt, clock) : '--:--'
+          }
+          detail={
+            nextRelease
+              ? nextRelease.name + ' - level ' + String(nextRelease.level)
+              : 'No members hospitalized'
+          }
+          icon="~"
+          tone="purple"
+        />
+      </div>
+
+      <div className="combat-grid">
+        <section
+          className="panel combat-panel"
+          id="chain"
+          aria-label="Faction chain tracker"
+        >
+          <div className="combat-heading">
             <div>
-              <h2>Opposing members</h2>
-              <p>
-                Live member status from {factionName}. Stat estimates use
-                personal and shared Fair Fight evidence.
-              </p>
+              <span className="combat-kicker">YOUR FACTION</span>
+              <h2>Chain tracker</h2>
             </div>
+            <span className="combat-indicator">
+              {activeChain ? 'Active' : 'Idle'}
+            </span>
+          </div>
+          {activeChain && combatBars?.chain ? (
+            <>
+              <div className="combat-value">
+                {combatBars.chain.current.toLocaleString()} <span>hits</span>
+              </div>
+              <div className="combat-timers">
+                <div>
+                  <span>Chain ends in</span>
+                  <strong>{formatCountdown(chainDeadline, clock)}</strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="combat-empty">
+              {combatBars
+                ? 'No active chain'
+                : combatBarsError
+                  ? 'Chain unavailable'
+                  : 'Loading chain…'}
+            </p>
+          )}
+          {combatBarsError && <p className="combat-error">{combatBarsError}</p>}
+          <div className="chain-keep-alive">
+            <h3>Keep the chain alive</h3>
+            <p>Find a random available player you beat in the last 14 days.</p>
             <button
-              className="add-button"
-              onClick={() => void refreshTargets()}
-              disabled={isLoading || isPaused || !apiKey}
+              className="refresh-button"
+              onClick={() => void findChainTarget()}
+              disabled={isFindingChainTarget}
             >
-              <span>&#8635;</span> Sync now
+              {isFindingChainTarget
+                ? 'Finding target…'
+                : chainTarget?.target
+                  ? 'Find another target'
+                  : 'Find keep-alive target'}
             </button>
-          </div>
-          {fairFightStatus === 'UNAVAILABLE' && (
-            <p className="ff-evidence-note">
-              Your Fair Fight history is unavailable. {fairFightReason}{' '}
-              Previously shared estimates are still shown when available.
-            </p>
-          )}
-          {fairFightStatus === 'NO_RECENT_FIGHTS' && (
-            <p className="ff-evidence-note">
-              No recent fights were found in your history. Shared estimates from
-              other players are shown when available.
-            </p>
-          )}
-          {sharedTbsReason && (
-            <p className="ff-evidence-note">{sharedTbsReason}</p>
-          )}
-          {travelTrackingReason &&
-            targets.some((target) => target.status === 'Traveling') && (
-              <p className="ff-evidence-note">{travelTrackingReason}</p>
-            )}
-          <div className="toolbar">
-            <div className="filter-tabs">
-              {filters.map((item) => (
-                <button
-                  key={item}
-                  className={
-                    filter === item ? 'filter-tab selected' : 'filter-tab'
-                  }
-                  onClick={() => setFilter(item)}
-                >
-                  {item}
-                  {item === 'All targets' && <em>{targets.length}</em>}
-                </button>
-              ))}
+            <div aria-live="polite" aria-busy={isFindingChainTarget}>
+              {chainTarget?.target && (
+                <div className="chain-target">
+                  <strong>{chainTarget.target.name}</strong>
+                  <span>
+                    #{chainTarget.target.id} · Level {chainTarget.target.level}
+                  </span>
+                  <span>
+                    Last beaten{' '}
+                    {new Date(
+                      chainTarget.target.lastWonAt,
+                    ).toLocaleDateString()}
+                    . Previous wins suggest you can beat them again.
+                  </span>
+                  {chainTargetFresh &&
+                  (!energyNow || energyNow.current >= 25) ? (
+                    <a
+                      className="attack-button"
+                      href={
+                        'https://www.torn.com/page.php?sid=attack&user2ID=' +
+                        chainTarget.target.id
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => {
+                        setChainTarget(null)
+                        barsNeedRefresh.current = true
+                      }}
+                    >
+                      Attack <span>&#8599;</span>
+                    </a>
+                  ) : (
+                    <span>
+                      {!chainTargetFresh
+                        ? 'Status check expired. Find a fresh target.'
+                        : 'You need 25 energy to attack.'}
+                    </span>
+                  )}
+                </div>
+              )}
+              {chainTarget?.message && <p>{chainTarget.message}</p>}
+              {chainTargetError && (
+                <p className="combat-error">{chainTargetError}</p>
+              )}
             </div>
-            <label className="search">
-              <span>&#9906;</span>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by name or ID"
-              />
-            </label>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>MEMBER</th>
-                  <th>STATUS</th>
-                  <th>RELEASE / LANDING</th>
-                  <th>REASON</th>
-                  <th>LAST SEEN</th>
-                  <th>EST. TBS</th>
-                  <th>PRIORITY</th>
-                  <th>
-                    <span className="sr-only">Action</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTargets.map((target) => (
-                  <TargetRow key={target.id} target={target} clock={clock} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {isLoading && targets.length === 0 && (
-            <div className="empty-state">Loading faction members...</div>
-          )}
-          {error && (
-            <div className="empty-state">Could not load live data. {error}</div>
-          )}
-          {!isLoading && !error && visibleTargets.length === 0 && (
-            <div className="empty-state">No members match this view.</div>
-          )}
-          <div className="panel-footer">
-            <span>
-              Showing {visibleTargets.length} of {targets.length} members
-            </span>
-            <span>
-              {isPaused
-                ? 'Hospital tracking paused'
-                : 'Refreshes every 30 seconds while this tab is visible'}
-            </span>
           </div>
         </section>
-        <footer className="footer-note">
-          <span className="shield">&#10003;</span> Data comes directly from Torn
-          and{' '}
-          {isPaused
-            ? 'War hospital tracking is paused.'
-            : 'is refreshed every 30 seconds while this tab is visible.'}
-        </footer>
-      </section>
-    </main>
-  )
-}
+        <section className="panel combat-panel" aria-label="Energy bar">
+          <div className="combat-heading">
+            <div>
+              <span className="combat-kicker">YOUR ENERGY</span>
+              <h2>Energy</h2>
+            </div>
+          </div>
+          {combatBars?.energy && energyNow ? (
+            <>
+              <div className="combat-value">
+                {energyNow.current} <span>/ {combatBars.energy.maximum}</span>
+              </div>
+              <div
+                className="energy-track"
+                role="progressbar"
+                aria-label="Energy"
+                aria-valuenow={Math.min(
+                  energyNow.current,
+                  combatBars.energy.maximum,
+                )}
+                aria-valuemin={0}
+                aria-valuemax={combatBars.energy.maximum}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(100, Math.max(0, (energyNow.current / combatBars.energy.maximum) * 100))}%`,
+                  }}
+                />
+              </div>
+              <div className="combat-timers">
+                <div>
+                  <span>Next refill</span>
+                  <strong>
+                    {energyNow.current >= combatBars.energy.maximum
+                      ? 'Full'
+                      : formatCountdown(energyNow.nextTickAt, clock)}
+                  </strong>
+                </div>
+                <div>
+                  <span>Full refill</span>
+                  <strong>
+                    {energyNow.current >= combatBars.energy.maximum
+                      ? 'Full'
+                      : formatCountdown(
+                          combatBars.fetchedAt! +
+                            combatBars.energy.full_time * 1000,
+                          clock,
+                        )}
+                  </strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="combat-empty">
+              {combatBarsError ? 'Energy unavailable' : 'Loading energy…'}
+            </p>
+          )}
+          {combatBarsError && <p className="combat-error">{combatBarsError}</p>}
+        </section>
+      </div>
 
-function ApiKeyGate({
-  error = '',
-  isLoading = false,
-  onSubmit,
-}: {
-  error?: string
-  isLoading?: boolean
-  onSubmit?: (apiKey: string) => Promise<boolean>
-}) {
-  return (
-    <main className="api-key-gate">
-      <section className="api-key-card">
-        <div className="brand">
-          <span className="brand-mark">TI</span>
-          <span>tornintel</span>
-        </div>
-        <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
-        <p>
-          Enter a Torn API key to use tornintel. A Limited key also lets us use
-          your recent Fair Fight history for battle-stat estimates shared with
-          other tornintel users. Your key stays in this browser and is sent to
-          the server to request Torn data.
-        </p>
-        {!isLoading && onSubmit && (
-          <form
-            className="api-key-login"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const formData = new FormData(event.currentTarget)
-              void onSubmit(String(formData.get('apiKey') ?? ''))
-            }}
+      <section className="panel target-panel" id="targets">
+        <div className="panel-header">
+          <div>
+            <h2>Opposing members</h2>
+            <p>
+              Live member status from {factionName}. Stat estimates use personal
+              and shared Fair Fight evidence.
+            </p>
+          </div>
+          <button
+            className="add-button"
+            onClick={() => void refreshTargets()}
+            disabled={isLoading || isPaused || !apiKey}
           >
-            <label htmlFor="login-api-key">Torn API key</label>
-            <input
-              id="login-api-key"
-              name="apiKey"
-              type="password"
-              autoComplete="off"
-              autoFocus
-              placeholder="Paste a Limited Torn API key"
-            />
-            {error && <p className="login-error">{error}</p>}
-            <button type="submit">Connect</button>
-          </form>
+            <span>&#8635;</span> Sync now
+          </button>
+        </div>
+        {fairFightStatus === 'UNAVAILABLE' && (
+          <p className="ff-evidence-note">
+            Your Fair Fight history is unavailable. {fairFightReason} Previously
+            shared estimates are still shown when available.
+          </p>
         )}
+        {fairFightStatus === 'NO_RECENT_FIGHTS' && (
+          <p className="ff-evidence-note">
+            No recent fights were found in your history. Shared estimates from
+            other players are shown when available.
+          </p>
+        )}
+        {sharedTbsReason && (
+          <p className="ff-evidence-note">{sharedTbsReason}</p>
+        )}
+        {travelTrackingReason &&
+          targets.some((target) => target.status === 'Traveling') && (
+            <p className="ff-evidence-note">{travelTrackingReason}</p>
+          )}
+        <TableToolbar view={targetView} />
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <SortHeader view={targetView} column="member">
+                  MEMBER
+                </SortHeader>
+                <th>STATUS</th>
+                <SortHeader view={targetView} column="release">
+                  RELEASE / LANDING
+                </SortHeader>
+                <th>REASON</th>
+                <th>LAST SEEN</th>
+                <SortHeader view={targetView} column="tbs">
+                  EST. TBS
+                </SortHeader>
+                <SortHeader view={targetView} column="priority">
+                  PRIORITY
+                </SortHeader>
+                <th>
+                  <span className="sr-only">Action</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {targetView.pageItems.map((target) => (
+                <TargetRow key={target.id} target={target} clock={clock} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {isLoading && targets.length === 0 && (
+          <div className="empty-state">Loading faction members...</div>
+        )}
+        {error && (
+          <div className="empty-state">Could not load live data. {error}</div>
+        )}
+        {!error && <TableEmpty view={targetView} noun="members" />}
+        <TablePagination view={targetView} noun="members">
+          {isPaused
+            ? 'Hospital tracking paused'
+            : 'Refreshes every 30 seconds while this tab is visible'}
+        </TablePagination>
       </section>
-    </main>
+      <footer className="footer-note">
+        <span className="shield">&#10003;</span> Data comes directly from Torn
+        and{' '}
+        {isPaused
+          ? 'War hospital tracking is paused.'
+          : 'is refreshed every 30 seconds while this tab is visible.'}
+      </footer>
+    </section>
   )
 }
 
@@ -983,7 +765,7 @@ function Stat({
   )
 }
 
-function TargetRow({ target, clock }: { target: Target; clock: number }) {
+function TargetRow({ target, clock }: { target: WarTarget; clock: number }) {
   const width = Math.max(
     12,
     Math.min(92, 100 - ((target.releaseAt - clock) / 1800000) * 100),

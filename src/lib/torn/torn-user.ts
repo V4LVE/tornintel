@@ -1,11 +1,4 @@
-export type UserProfile = {
-  id: number
-  name: string
-  level: number
-  factionName: string
-}
-
-type UserResponse = { user?: UserProfile; error?: string }
+import type { UserProfile, UserResponse } from '#/models/account'
 
 export async function verifyTornUser(apiKey: string): Promise<UserProfile> {
   const response = await fetch('/api/user', {

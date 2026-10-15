@@ -1,5 +1,16 @@
-import type { BattleStatsEstimate } from '#/lib/battle-stats/estimator'
-import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
+import type {
+  BattleStatContributor,
+  BattleStatsEstimate,
+} from '#/models/battle-stats'
+
+// Sorts by the point estimate, falling back to a known bound; unknown sorts last.
+export function battleStatsSortValue(
+  estimate: BattleStatsEstimate | undefined,
+) {
+  return (
+    estimate?.estimate ?? estimate?.lowerBound ?? estimate?.upperBound ?? null
+  )
+}
 
 // Shared by the war hospital target list and the levelling list.
 export function BattleStatsCell({

@@ -1,13 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
-
-type TornUserResponse = {
-  player_id?: number
-  name?: string
-  level?: number
-  faction?: { faction_id?: number; faction_name?: string }
-  error?: { error: string; code: number }
-}
+import type { TornUserResponse } from '#/models/torn'
 
 export const Route = createFileRoute('/api/(account)/user')({
   server: {

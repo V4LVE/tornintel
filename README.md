@@ -2,6 +2,8 @@
 
 Torn faction tools built with TanStack Start. The main page tracks an opposing faction's hospital status, your faction's chain, and your energy. The payouts page calculates ranked war payouts, and Settings manages the API key stored in this browser.
 
+Every page shares one layout: a sidebar split into **Faction** tools (war hospital, target list, war payout, war deals) and **Personal** tools (levelling targets and My stats), plus a top bar. Connecting a Torn API key once unlocks every page.
+
 ## Run locally
 
 ```bash
@@ -23,10 +25,12 @@ npm start
 - `src/routes/index.tsx`: hospital dashboard and live chain and energy panels.
 - `src/routes/payouts.tsx`: ranked war payout calculator.
 - `src/routes/war-deals.tsx`: war deal planning and editable proposals for both outcomes. With a saved API key, faction names, current war target, item market prices, and each faction's latest completed cache rewards load automatically. Cache counts are a labeled historical baseline, not a prediction for the entered scores; all values can be adjusted manually. Compensation uses the losing faction's score, with whole items and a cash remainder. Payment wording appears only when a rate or timing is supplied. Manual planning remains available without an API key at `/war-deals`.
-- `src/routes/my-stats.tsx`: your own battle stats with modifiers, a progress chart (7D to 1Y), range gains, and a build summary. Past readings come from Torn's historical `personalstats` and are cached in this browser's local storage. Below that, players can opt in to share their real stats with their faction, and see a list of their faction with the real stats and progression of members who share, plus optional FF Scouter estimates (the same opt-in and key as on the levelling page). Shared readings are fetched by the server from Torn, stored in the database, and deleted when sharing is turned off.
+- `src/routes/my-stats.tsx`: your own battle stats with modifiers, a progress chart (7D to 1Y), range gains, and a build summary. Past readings come from Torn's historical `personalstats` and are cached in this browser's local storage. Below that, players share their real stats with their faction by default (they can turn it off), and see a list of their faction with the real stats and progression of members who share, plus optional FF Scouter estimates (the same opt-in and key as on the levelling page). Shared readings are fetched by the server from Torn, stored in the database, and deleted when sharing is turned off; the opt-out is remembered.
 - `src/routes/levelling.tsx`: levelling targets grouped into tiers of ten levels.
+- `src/components/table-controls.tsx` and `src/lib/hooks/use-table-view.ts`: shared search, filter tabs, sortable column headings and pagination used by every list.
 - `src/routes/settings.tsx`: API key and connected account settings.
 - `src/routes/api/`: server endpoints, grouped per feature in route-group folders such as `(levelling)/` that do not change the URL.
+- `src/models/`: shared types and DTOs, one file per feature, used by both API routes and pages.
 - `src/lib/<feature>/`: logic per feature (`torn`, `war-hospital`, `travel`, `battle-stats`, `levelling`, `ffscouter`, `war-deals`, `auth`, `hooks`), with tests next to the code.
 - `src/components/`: shared React components.
 - `src/styles.css`: application styles. Colors are CSS variables with dark and light values at the top of the file; the theme button in the war hospital top bar switches between them and is remembered in the browser.
@@ -49,7 +53,7 @@ npm run build
 
 The bundled players live in `src/lib/levelling/players.json` as an array of `{ name, id, lvl, total, str, def, spd, dex }` (numbers may be strings with commas; a duplicate ID keeps the first entry). Their stats are a recorded snapshot: Torn's API only returns battle stats for the key owner.
 
-With a saved API key the list also shows a TBS column: the same Fair Fight based estimate as the war hospital target list, from the shared evidence in PostgreSQL (see Shared TBS storage below). Loading it shares the viewer's recent fights, so attacks on levelling targets improve the estimates for everyone. Players without recorded fights show No FF evidence. The list can be sorted by listed total, TBS, or FF Scouter estimate.
+With a saved API key the list also shows a TBS column: the same Fair Fight based estimate as the war hospital target list, from the shared evidence in PostgreSQL (see Shared TBS storage below). Loading it shares the viewer's recent fights, so attacks on levelling targets improve the estimates for everyone. Players without recorded fights show No FF evidence. Click a column heading to sort the list (for example by level, listed total, TBS or FF Scouter estimate); it can also be searched and filtered to players from the original lists or players added in tornintel.
 
 ### FF Scouter
 

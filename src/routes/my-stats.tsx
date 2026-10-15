@@ -1,6 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import type { PointerEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PageHeading } from '#/components/app-shell'
+import { useSession } from '#/components/session'
+import {
+  SortHeader,
+  TableEmpty,
+  TablePagination,
+  TableToolbar,
+} from '#/components/table-controls'
+import { useTableView } from '#/lib/hooks/use-table-view'
+import type { TableFilter } from '#/lib/hooks/use-table-view'
 import {
   RANGES,
   STAT_META,
@@ -18,7 +28,8 @@ import type {
   RangeKey,
   StatName,
   StatPoint,
-} from '#/lib/battle-stats/my-stats'
+  StatSharingResponse,
+} from '#/models/my-stats'
 import { clearStatHistory, useStatHistory } from '#/lib/hooks/use-stat-history'
 import { useVisiblePolling } from '#/lib/hooks/use-visible-polling'
 import { FF_SCOUTER_KEY_STORAGE } from '#/lib/ffscouter/ffscouter'
@@ -34,8 +45,8 @@ const ICON_CLASS: Record<StatName, string> = {
 }
 
 function MyStats() {
-  const [apiKey, setApiKey] = useState('')
-  const [isReady, setIsReady] = useState(false)
+  // AppShell only renders pages once a verified key exists.
+  const { apiKey } = useSession()
   const [stats, setStats] = useState<MyStatsResponse | null>(null)
   const [error, setError] = useState('')
   const [range, setRange] = useState<RangeKey>('30d')
@@ -43,11 +54,6 @@ function MyStats() {
   const [recentGain, setRecentGain] = useState(0)
   const lastTotal = useRef<number | null>(null)
   const [historyRevision, setHistoryRevision] = useState(0)
-
-  useEffect(() => {
-    setApiKey(window.localStorage.getItem('tornintel.apiKey') ?? '')
-    setIsReady(true)
-  }, [])
 
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
@@ -94,59 +100,14 @@ function MyStats() {
     historyRevision,
   )
   const first = history.points.length > 1 ? history.points[0] : null
-
-  if (!isReady) return null
-
-  if (!apiKey) {
-    return (
-      <main className="api-key-gate">
-        <section className="api-key-card">
-          <div className="brand">
-            <span className="brand-mark">TI</span>
-            <span>tornintel</span>
-          </div>
-          <h1>Connect to Torn</h1>
-          <p>
-            Add a Limited Torn API key in Settings to see your battle stats.
-          </p>
-          <a className="add-button my-stats-cta" href="/settings">
-            Open settings
-          </a>
-        </section>
-      </main>
-    )
-  }
-
   const build = current ? describeBuild(current) : null
 
   return (
-    <main className="settings-page">
-      <header className="settings-topbar">
-        <a className="brand" href="/">
-          <span className="brand-mark">TI</span>
-          <span>tornintel</span>
-        </a>
-        <a className="back-link" href="/">
-          Back to war hospital
-        </a>
-      </header>
-      <section className="my-stats-content">
-        <div className="settings-heading my-stats-heading">
-          <div>
-            <span>PERSONAL</span>
-            <h1>My battle stats</h1>
-            <p>
-              {stats
-                ? `${stats.profile.name} · Level ${stats.profile.level} · updated ${new Date(stats.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                : 'Loading your battle stats…'}
-              {recentGain > 0 && (
-                <b className="my-stats-gain">
-                  {' '}
-                  {formatSignedStat(recentGain)} since the last refresh
-                </b>
-              )}
-            </p>
-          </div>
+    <section className="payout-page my-stats-page">
+      <PageHeading
+        eyebrow="PERSONAL"
+        title="My battle stats"
+        actions={
           <button
             type="button"
             className="text-button"
@@ -154,151 +115,160 @@ function MyStats() {
           >
             Refresh
           </button>
-        </div>
-
-        {error && <p className="settings-error">{error}</p>}
-        {history.error && (
-          <p className="settings-error">
-            Some history couldn't be loaded: {history.error}
-          </p>
+        }
+      >
+        {stats
+          ? `${stats.profile.name} · Level ${stats.profile.level} · updated ${new Date(stats.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : 'Loading your battle stats…'}
+        {recentGain > 0 && (
+          <b className="my-stats-gain">
+            {' '}
+            {formatSignedStat(recentGain)} since the last refresh
+          </b>
         )}
+      </PageHeading>
 
-        {stats && current && (
-          <>
-            <div className="stat-grid">
-              {STAT_NAMES.map((stat) => {
-                const detail = stats.battlestats[stat]
-                const modifierText = detail.modifiers
-                  .map(
-                    (modifier) =>
-                      `${modifier.value > 0 ? '+' : ''}${modifier.value}% ${modifier.effect}`,
-                  )
-                  .join('\n')
-                return (
-                  <div className="stat-card" key={stat}>
-                    <span className={`stat-icon ${ICON_CLASS[stat]}`}>
-                      {STAT_META[stat].short.charAt(0)}
-                    </span>
-                    <div>
-                      <div className="stat-label" title={STAT_META[stat].blurb}>
-                        {STAT_META[stat].label}
-                      </div>
-                      <div
-                        className="stat-value"
-                        title={detail.value.toLocaleString()}
-                      >
-                        {formatCompactStat(detail.value)}
-                      </div>
-                      <div
-                        className="stat-detail"
-                        title={modifierText || 'No active modifiers'}
-                      >
-                        Effective{' '}
-                        {formatCompactStat(
-                          effectiveValue(detail.value, detail.modifier),
-                        )}{' '}
-                        ({detail.modifier >= 0 ? '+' : ''}
-                        {detail.modifier}%)
-                        {first && (
-                          <>
-                            {' · '}
-                            {formatSignedStat(current[stat] - first[stat])}{' '}
-                            {RANGES[range].label}
-                          </>
-                        )}
-                      </div>
+      {error && <p className="settings-error">{error}</p>}
+      {history.error && (
+        <p className="settings-error">
+          Some history couldn't be loaded: {history.error}
+        </p>
+      )}
+
+      {stats && current && (
+        <>
+          <div className="stat-grid">
+            {STAT_NAMES.map((stat) => {
+              const detail = stats.battlestats[stat]
+              const modifierText = detail.modifiers
+                .map(
+                  (modifier) =>
+                    `${modifier.value > 0 ? '+' : ''}${modifier.value}% ${modifier.effect}`,
+                )
+                .join('\n')
+              return (
+                <div className="stat-card" key={stat}>
+                  <span className={`stat-icon ${ICON_CLASS[stat]}`}>
+                    {STAT_META[stat].short.charAt(0)}
+                  </span>
+                  <div>
+                    <div className="stat-label" title={STAT_META[stat].blurb}>
+                      {STAT_META[stat].label}
+                    </div>
+                    <div
+                      className="stat-value"
+                      title={detail.value.toLocaleString()}
+                    >
+                      {formatCompactStat(detail.value)}
+                    </div>
+                    <div
+                      className="stat-detail"
+                      title={modifierText || 'No active modifiers'}
+                    >
+                      Effective{' '}
+                      {formatCompactStat(
+                        effectiveValue(detail.value, detail.modifier),
+                      )}{' '}
+                      ({detail.modifier >= 0 ? '+' : ''}
+                      {detail.modifier}%)
+                      {first && (
+                        <>
+                          {' · '}
+                          {formatSignedStat(current[stat] - first[stat])}{' '}
+                          {RANGES[range].label}
+                        </>
+                      )}
                     </div>
                   </div>
-                )
-              })}
-            </div>
-
-            <section className="panel my-stats-panel">
-              <div className="panel-header my-stats-panel-header">
-                <div>
-                  <h2>
-                    Total {formatCompactStat(current.total)}
-                    {first && (
-                      <span className="my-stats-gain">
-                        {' '}
-                        {formatSignedStat(current.total - first.total)}
-                      </span>
-                    )}
-                  </h2>
-                  <p>
-                    {history.isLoading
-                      ? `Loading history ${Math.round(history.progress * 100)}%`
-                      : 'History comes from Torn and is cached in this browser.'}
-                  </p>
                 </div>
-                <div className="my-stats-controls">
-                  <div className="filter-tabs">
-                    {(['total', 'stats'] as const).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={`filter-tab ${mode === value ? 'selected' : ''}`}
-                        onClick={() => setMode(value)}
-                      >
-                        {value === 'total' ? 'Total' : 'Per stat'}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="filter-tabs">
-                    {(Object.keys(RANGES) as RangeKey[]).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={`filter-tab ${range === value ? 'selected' : ''}`}
-                        onClick={() => setRange(value)}
-                      >
-                        {RANGES[value].label}
-                      </button>
-                    ))}
-                  </div>
+              )
+            })}
+          </div>
+
+          <section className="panel my-stats-panel">
+            <div className="panel-header my-stats-panel-header">
+              <div>
+                <h2>
+                  Total {formatCompactStat(current.total)}
+                  {first && (
+                    <span className="my-stats-gain">
+                      {' '}
+                      {formatSignedStat(current.total - first.total)}
+                    </span>
+                  )}
+                </h2>
+                <p>
+                  {history.isLoading
+                    ? `Loading history ${Math.round(history.progress * 100)}%`
+                    : 'History comes from Torn and is cached in this browser.'}
+                </p>
+              </div>
+              <div className="my-stats-controls">
+                <div className="table-tabs">
+                  {(['total', 'stats'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`table-tab ${mode === value ? 'selected' : ''}`}
+                      onClick={() => setMode(value)}
+                    >
+                      {value === 'total' ? 'Total' : 'Per stat'}
+                    </button>
+                  ))}
+                </div>
+                <div className="table-tabs">
+                  {(Object.keys(RANGES) as RangeKey[]).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`table-tab ${range === value ? 'selected' : ''}`}
+                      onClick={() => setRange(value)}
+                    >
+                      {RANGES[value].label}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <ProgressChart points={history.points} mode={mode} />
+            </div>
+            <ProgressChart points={history.points} mode={mode} />
+          </section>
+
+          {build && (
+            <section className="panel my-stats-panel">
+              <div className="panel-header">
+                <div>
+                  <h2>{build.title}</h2>
+                  <p>{build.description}</p>
+                </div>
+              </div>
+              <div className="my-stats-balance">
+                <div className="my-stats-balance-labels">
+                  <span>
+                    Offense (STR + SPD) {Math.round(build.offenseShare * 100)}%
+                  </span>
+                  <span>
+                    {Math.round((1 - build.offenseShare) * 100)}% Defense (DEF +
+                    DEX)
+                  </span>
+                </div>
+                <div className="my-stats-balance-track">
+                  <i style={{ width: `${build.offenseShare * 100}%` }} />
+                </div>
+              </div>
             </section>
+          )}
+        </>
+      )}
 
-            {build && (
-              <section className="panel my-stats-panel">
-                <div className="panel-header">
-                  <div>
-                    <h2>{build.title}</h2>
-                    <p>{build.description}</p>
-                  </div>
-                </div>
-                <div className="my-stats-balance">
-                  <div className="my-stats-balance-labels">
-                    <span>
-                      Offense (STR + SPD) {Math.round(build.offenseShare * 100)}
-                      %
-                    </span>
-                    <span>
-                      {Math.round((1 - build.offenseShare) * 100)}% Defense (DEF
-                      + DEX)
-                    </span>
-                  </div>
-                  <div className="my-stats-balance-track">
-                    <i style={{ width: `${build.offenseShare * 100}%` }} />
-                  </div>
-                </div>
-              </section>
-            )}
-          </>
-        )}
-
-        <FactionStats
-          apiKey={apiKey}
-          onSharingEnabled={() => {
-            // Refetch history through the server so it is stored for the faction.
-            if (stats) clearStatHistory(stats.profile.id)
-            setHistoryRevision((revision) => revision + 1)
-          }}
-        />
-      </section>
-    </main>
+      <FactionStats
+        apiKey={apiKey}
+        onSharingEnabled={() => {
+          // Refetch history through the server so it is stored for the faction.
+          if (stats) clearStatHistory(stats.profile.id)
+          setHistoryRevision((revision) => revision + 1)
+        }}
+      />
+    </section>
   )
 }
 
@@ -328,6 +298,27 @@ async function requestJson<T>(
 
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback
+
+const MEMBER_FILTERS: TableFilter<FactionStatsMember, string>[] = [
+  { id: 'all', label: 'All members' },
+  { id: 'sharing', label: 'Sharing', test: (member) => !!member.shared },
+  { id: 'not-sharing', label: 'Not sharing', test: (member) => !member.shared },
+]
+
+// Shared readings inside the chosen range, oldest first.
+function pointsSince(member: FactionStatsMember, since: number) {
+  return (
+    member.shared?.history.filter((point) => point.timestamp >= since) ?? []
+  )
+}
+
+// Gain over the range; undefined without two readings in it, so it sorts last.
+function rangeGain(member: FactionStatsMember, since: number) {
+  const points = pointsSince(member, since)
+  return member.shared && points.length > 1
+    ? member.shared.current.total - points[0].total
+    : undefined
+}
 
 function FactionStats({
   apiKey,
@@ -384,14 +375,12 @@ function FactionStats({
 
   useEffect(() => {
     const controller = new AbortController()
-    requestJson<{ isSharing: boolean; factionName: string | null }>(
-      '/api/stat-sharing',
-      apiKey,
-      { signal: controller.signal },
-    )
+    requestJson<StatSharingResponse>('/api/stat-sharing', apiKey, {
+      signal: controller.signal,
+    })
       .then((sharing) => {
         setIsSharing(sharing.isSharing)
-        setFactionName(sharing.factionName)
+        setFactionName(sharing.factionName ?? null)
       })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) return
@@ -418,7 +407,7 @@ function FactionStats({
     setIsSaving(true)
     setSharingError('')
     try {
-      const result = await requestJson<{ isSharing: boolean }>(
+      const result = await requestJson<StatSharingResponse>(
         '/api/stat-sharing',
         apiKey,
         { method: 'POST', body: JSON.stringify({ enabled }) },
@@ -436,6 +425,18 @@ function FactionStats({
   }
 
   const since = Date.now() / 1000 - RANGES[range].days * 86_400
+  // Without a sort the list keeps the server's order, best known total first.
+  const memberView = useTableView(data?.members ?? [], {
+    search: (member) => [member.name, member.id],
+    filters: MEMBER_FILTERS,
+    sorts: {
+      member: (member) => member.name,
+      level: (member) => member.level,
+      estimate: (member) => member.estimate?.total,
+      total: (member) => member.shared?.current.total,
+      gain: (member) => rangeGain(member, since),
+    },
+  })
   const sharedCount =
     data?.members.filter((member) => member.shared).length ?? 0
   const faction = factionName ?? 'your faction'
@@ -448,8 +449,8 @@ function FactionStats({
             <h2>Share with your faction</h2>
             <p>
               {isSharing
-                ? `Members of ${faction} can see your real stats and progression. They update whenever you open this page.`
-                : `Let members of ${faction} see your real battle stats and how they progress. Turning this off deletes what was shared.`}
+                ? `Sharing is on by default: members of ${faction} see your real stats and progression, updated whenever you open this page. Turning it off deletes what was shared.`
+                : `You turned sharing off. Turn it on to let members of ${faction} see your real battle stats and how they progress.`}
             </p>
           </div>
           <label className="share-toggle">
@@ -492,18 +493,18 @@ function FactionStats({
                 ffscouter.com
               </a>{' '}
               and must be registered there.{' '}
-              <a href="/settings">
+              <Link to="/settings">
                 {ffScouterKey ? 'Change' : 'Use a separate'} FF Scouter key
-              </a>
+              </Link>
             </p>
           </div>
           <div className="my-stats-controls">
-            <div className="filter-tabs">
+            <div className="table-tabs">
               {(Object.keys(RANGES) as RangeKey[]).map((value) => (
                 <button
                   key={value}
                   type="button"
-                  className={`filter-tab ${range === value ? 'selected' : ''}`}
+                  className={`table-tab ${range === value ? 'selected' : ''}`}
                   onClick={() => setRange(value)}
                 >
                   {RANGES[value].label}
@@ -521,46 +522,66 @@ function FactionStats({
           </div>
         </div>
         {data?.ffScouterReason && (
-          <p className="settings-error">{data.ffScouterReason}</p>
+          <p className="ff-evidence-note">{data.ffScouterReason}</p>
         )}
         {data?.sharingReason && (
-          <p className="settings-error">{data.sharingReason}</p>
+          <p className="ff-evidence-note">{data.sharingReason}</p>
         )}
 
         {data && data.members.length > 0 && (
-          <div className="table-wrap">
-            <table className="faction-stats-table">
-              <thead>
-                <tr>
-                  <th>MEMBER</th>
-                  <th>LEVEL</th>
-                  {useFfScouter && <th>FF SCOUTER EST.</th>}
-                  <th>REAL TOTAL</th>
-                  <th>GAIN {RANGES[range].label}</th>
-                  <th>
-                    <span className="sr-only">Progress</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.members.map((member) => (
-                  <FactionMemberRow
-                    key={member.id}
-                    member={member}
-                    isViewer={member.id === data.viewer.id}
-                    isExpanded={expanded === member.id}
-                    onToggle={() =>
-                      setExpanded((current) =>
-                        current === member.id ? null : member.id,
-                      )
-                    }
-                    since={since}
-                    showEstimate={Boolean(useFfScouter)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <TableToolbar view={memberView} />
+            <div className="table-wrap">
+              <table className="faction-stats-table">
+                <thead>
+                  <tr>
+                    <SortHeader view={memberView} column="member">
+                      MEMBER
+                    </SortHeader>
+                    <SortHeader view={memberView} column="level">
+                      LEVEL
+                    </SortHeader>
+                    {useFfScouter && (
+                      <SortHeader view={memberView} column="estimate">
+                        FF SCOUTER EST.
+                      </SortHeader>
+                    )}
+                    <SortHeader view={memberView} column="total">
+                      REAL TOTAL
+                    </SortHeader>
+                    <SortHeader view={memberView} column="gain">
+                      GAIN {RANGES[range].label}
+                    </SortHeader>
+                    <th>
+                      <span className="sr-only">Progress</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memberView.pageItems.map((member) => (
+                    <FactionMemberRow
+                      key={member.id}
+                      member={member}
+                      isViewer={member.id === data.viewer.id}
+                      isExpanded={expanded === member.id}
+                      onToggle={() =>
+                        setExpanded((current) =>
+                          current === member.id ? null : member.id,
+                        )
+                      }
+                      since={since}
+                      showEstimate={Boolean(useFfScouter)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <TableEmpty view={memberView} noun="members" />
+            <TablePagination view={memberView} noun="members">
+              Real totals and gains come from members who share. Others sort
+              last.
+            </TablePagination>
+          </>
         )}
         {isLoading && !data && (
           <div className="empty-state">Loading faction members…</div>
@@ -588,11 +609,9 @@ function FactionMemberRow({
 }) {
   const { estimate, shared } = member
   const [mode, setMode] = useState<'total' | 'stats'>('total')
-  const points = useMemo(
-    () => shared?.history.filter((point) => point.timestamp >= since) ?? [],
-    [shared, since],
-  )
+  const points = useMemo(() => pointsSince(member, since), [member, since])
   const first = points.length > 1 ? points[0] : null
+  const gain = rangeGain(member, since)
 
   return (
     <>
@@ -630,10 +649,8 @@ function FactionMemberRow({
           )}
         </td>
         <td>
-          {first && shared ? (
-            <span className="my-stats-gain">
-              {formatSignedStat(shared.current.total - first.total)}
-            </span>
+          {gain !== undefined ? (
+            <span className="my-stats-gain">{formatSignedStat(gain)}</span>
           ) : (
             <span className="faction-stats-muted">—</span>
           )}
@@ -668,12 +685,12 @@ function FactionMemberRow({
                   )}
                 </div>
               ))}
-              <div className="filter-tabs">
+              <div className="table-tabs">
                 {(['total', 'stats'] as const).map((value) => (
                   <button
                     key={value}
                     type="button"
-                    className={`filter-tab ${mode === value ? 'selected' : ''}`}
+                    className={`table-tab ${mode === value ? 'selected' : ''}`}
                     onClick={() => setMode(value)}
                   >
                     {value === 'total' ? 'Total' : 'Per stat'}

@@ -4,7 +4,7 @@ import {
   sharedEvidenceRepository,
   syncSharedEvidence,
 } from './shared-evidence.server'
-import type { SharedObservation } from './shared-evidence.server'
+import type { SharedObservation } from '#/models/battle-stats'
 
 const evidence: SharedObservation = {
   evidenceId: '789:42',

@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { LevellingListChange } from './levelling'
-import { bundledPlayers, levellingListRepository } from './levelling.server'
+import {
+  bundledPlayers,
+  isLevellingEditor,
+  levellingListRepository,
+} from './levelling.server'
 import { Route } from '../../routes/api/(levelling)/levelling-list'
+import type { LevellingListChange } from '#/models/levelling'
 
 const handlers = Route.options.server?.handlers as
   | Partial<Record<'GET' | 'POST', (context: never) => Promise<Response>>>
@@ -100,16 +104,80 @@ async function withListEnvironment(
     globalThis.fetch = originalFetch
     levellingListRepository.load = load
     levellingListRepository.save = save
-    for (const [name, value] of [
-      ['DATABASE_URL', saved.url],
-      ['LEVELLING_EDITOR_IDS', saved.ids],
-      ['LEVELLING_EDITOR_FACTION_IDS', saved.factions],
-    ] as const) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
+    setEnv('DATABASE_URL', saved.url)
+    setEnv('LEVELLING_EDITOR_IDS', saved.ids)
+    setEnv('LEVELLING_EDITOR_FACTION_IDS', saved.factions)
   }
 }
+
+function withEditorEnv(
+  env: { ids: string | undefined; factions: string | undefined },
+  run: () => void,
+) {
+  const saved = {
+    ids: process.env.LEVELLING_EDITOR_IDS,
+    factions: process.env.LEVELLING_EDITOR_FACTION_IDS,
+  }
+  setEnv('LEVELLING_EDITOR_IDS', env.ids)
+  setEnv('LEVELLING_EDITOR_FACTION_IDS', env.factions)
+  try {
+    run()
+  } finally {
+    setEnv('LEVELLING_EDITOR_IDS', saved.ids)
+    setEnv('LEVELLING_EDITOR_FACTION_IDS', saved.factions)
+  }
+}
+
+function setEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
+}
+
+test('editors match configured player or faction IDs only', () => {
+  withEditorEnv({ ids: ' 42 , 43,', factions: '555' }, () => {
+    assert.equal(isLevellingEditor({ id: 42, factionId: null }), true)
+    assert.equal(isLevellingEditor({ id: 43, factionId: 901 }), true)
+    assert.equal(isLevellingEditor({ id: 7, factionId: 555 }), true)
+    assert.equal(isLevellingEditor({ id: 7, factionId: 556 }), false)
+    assert.equal(isLevellingEditor({ id: 7, factionId: null }), false)
+    // Player and faction IDs are separate lists and must not match each other.
+    assert.equal(isLevellingEditor({ id: 555, factionId: 42 }), false)
+  })
+})
+
+test('empty or malformed editor configuration makes nobody an editor', () => {
+  const configurations: [string | undefined, string | undefined][] = [
+    [undefined, undefined],
+    ['', ''],
+    [' , ', ' '],
+    ['abc,-1,0,1.5', 'NaN, ,0'],
+  ]
+  for (const [ids, factions] of configurations) {
+    withEditorEnv({ ids, factions }, () => {
+      // Blank entries parse as 0, which must never match a missing ID.
+      assert.equal(isLevellingEditor({ id: 0, factionId: 0 }), false)
+      assert.equal(isLevellingEditor({ id: 1, factionId: 1 }), false)
+      assert.equal(isLevellingEditor({ id: 42, factionId: null }), false)
+    })
+  }
+})
+
+test('changing the list requires a verified Torn key and shared storage', async () => {
+  await withListEnvironment(async ({ changes, request }) => {
+    const remove = { playerId: bundledPlayers[0].id, action: 'remove' }
+    const missing = await request('', 'POST', remove)
+    assert.equal(missing.status, 401)
+    assert.match((await missing.json()).error, /API key/)
+    // A key Torn rejects must not count as an editor or an anonymous change.
+    const rejected = await request('rejected-key', 'POST', remove)
+    assert.equal(rejected.status, 401)
+    assert.equal((await rejected.json()).error, 'Incorrect key')
+    delete process.env.DATABASE_URL
+    const withoutStorage = await request('editor-key', 'POST', remove)
+    assert.equal(withoutStorage.status, 503)
+    assert.equal(changes.length, 0)
+  })
+})
 
 test('an untrusted user cannot remove players from the shared list', async () => {
   await withListEnvironment(async ({ changes, request }) => {
@@ -130,13 +198,18 @@ test('an untrusted user cannot remove players from the shared list', async () =>
 
 test('nobody can remove players when no editors are configured', async () => {
   await withListEnvironment(async ({ changes, request }) => {
-    delete process.env.LEVELLING_EDITOR_IDS
-    delete process.env.LEVELLING_EDITOR_FACTION_IDS
-    const response = await request('editor-key', 'POST', {
-      playerId: bundledPlayers[0].id,
-      action: 'remove',
-    })
-    assert.equal(response.status, 403)
+    for (const value of [undefined, '', ' , ']) {
+      setEnv('LEVELLING_EDITOR_IDS', value)
+      setEnv('LEVELLING_EDITOR_FACTION_IDS', value)
+      for (const key of ['editor-key', 'faction-key']) {
+        const response = await request(key, 'POST', {
+          playerId: bundledPlayers[0].id,
+          action: 'remove',
+        })
+        assert.equal(response.status, 403)
+        assert.equal((await (await request(key, 'GET')).json()).canEdit, false)
+      }
+    }
     assert.equal(changes.length, 0)
   })
 })
@@ -234,10 +307,13 @@ test('the list stays public and reports editor access only for editors', async (
     const anonymous = await (await request('', 'GET')).json()
     assert.equal(anonymous.players.length, bundledPlayers.length)
     assert.equal(anonymous.canEdit, false)
-    assert.equal(
-      (await (await request('editor-key', 'GET')).json()).canEdit,
-      true,
-    )
+    for (const [key, canEdit] of [
+      ['editor-key', true],
+      ['faction-key', true],
+      ['stranger-key', false],
+    ] as const) {
+      assert.equal((await (await request(key, 'GET')).json()).canEdit, canEdit)
+    }
     // A broken key must not hide the list, only editor access.
     const broken = await request('broken-key', 'GET')
     assert.equal(broken.status, 200)

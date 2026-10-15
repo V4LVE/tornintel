@@ -2,7 +2,7 @@ import { inArray, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { factionMemberTravel } from '#/db/schema'
 import { estimateTravel, observeTravel } from './travel'
-import type { MemberStatus, TravelSnapshot } from './travel'
+import type { MemberStatus, TravelSnapshot } from '#/models/travel'
 
 type MemberObservation = { playerId: string; status: MemberStatus }
 const memory = new Map<string, TravelSnapshot>()

@@ -11,17 +11,13 @@ import {
   ffScouterKeyFrom,
 } from '#/lib/ffscouter/ffscouter.server'
 import { myStatsErrorResponse } from '#/lib/battle-stats/my-stats.server'
-import type { FfScouterEstimate } from '#/lib/levelling/levelling'
+import type { FfScouterEstimate } from '#/models/ffscouter'
 import type {
   FactionStatsMember,
   FactionStatsResponse,
   StatPoint,
-} from '#/lib/battle-stats/my-stats'
-
-type TornFactionResponse = {
-  name?: string
-  members?: Record<string, { name: string; level: number }>
-}
+} from '#/models/my-stats'
+import type { TornFactionBasicResponse } from '#/models/torn'
 
 export const Route = createFileRoute('/api/(my-stats)/faction-stats')({
   server: {
@@ -51,9 +47,12 @@ export const Route = createFileRoute('/api/(my-stats)/faction-stats')({
           )
           url.searchParams.set('selections', '')
           url.searchParams.set('key', apiKey)
-          const { data: faction } = await fetchTorn<TornFactionResponse>(url, {
-            maxAgeMs: 60000,
-          })
+          const { data: faction } = await fetchTorn<TornFactionBasicResponse>(
+            url,
+            {
+              maxAgeMs: 60000,
+            },
+          )
           const entries = Object.entries(faction.members ?? {})
           const memberIds = entries.map(([id]) => id)
 

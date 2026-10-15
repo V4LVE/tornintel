@@ -1,44 +1,13 @@
 import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 import { calculateBalanceFactor, calculateBattleStatScore } from './estimator'
-import type { BattleStats, FairFightObservation } from './estimator'
-import type { SharedObservation } from './shared-evidence.server'
+import type {
+  BattleStats,
+  FairFightLoad,
+  FairFightObservation,
+  SharedObservation,
+} from '#/models/battle-stats'
+import type { TornBattleStat, TornCombatResponse } from '#/models/torn'
 
-type TornBattleStat = number | string | { value?: number | string }
-
-type TornAttack = {
-  id?: number | string
-  attacker_id?: number
-  defender_id?: number
-  timestamp_ended?: number
-  timestamp_started?: number
-  modifiers?: { fair_fight?: number; group_attack?: number }
-  result?: string
-  is_interrupted?: boolean
-}
-
-type TornCombatResponse = {
-  player_id?: number
-  name?: string
-  // API v1 merges selections into the top-level response. API v2 nests them.
-  strength?: TornBattleStat
-  speed?: TornBattleStat
-  defense?: TornBattleStat
-  dexterity?: TornBattleStat
-  battlestats?: {
-    strength?: TornBattleStat
-    speed?: TornBattleStat
-    defense?: TornBattleStat
-    dexterity?: TornBattleStat
-  }
-  attacks?: Record<string, TornAttack> | TornAttack[]
-  error?: { error: string; code: number }
-}
-export type FairFightLoad = {
-  evidence: SharedObservation[]
-  observations: Map<string, FairFightObservation[]>
-  status: 'READY' | 'NO_RECENT_FIGHTS' | 'UNAVAILABLE'
-  reason?: string
-}
 const CURRENT_PLAYER_STATS_WINDOW = 14 * 24 * 60 * 60 * 1000
 
 export async function loadFairFightEvidence(

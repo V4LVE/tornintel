@@ -1,29 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { resolveEnemyFaction } from '#/lib/war-hospital/enemy-faction.server'
-import type { EnemyFaction } from '#/lib/war-hospital/enemy-faction.server'
 import { fetchTorn, TornApiError } from '#/lib/torn/torn-api.server'
 import { syncTravelTracking } from '#/lib/travel/travel.server'
-import type { MemberStatus, TravelEstimate } from '#/lib/travel/travel'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
-import type { BattleStatContributor } from '#/lib/battle-stats/shared-evidence.server'
 import { estimateBattleStats } from '#/lib/battle-stats/estimator'
-import type { FairFightObservation } from '#/lib/battle-stats/estimator'
 import { loadFairFightEvidence } from '#/lib/battle-stats/fair-fight-evidence.server'
-
-type TornMember = {
-  name: string
-  level: number
-  last_action?: { relative?: string | number; status?: string }
-  status: MemberStatus
-}
-
-type TornFactionResponse = {
-  ID: number
-  name: string
-  tag: string
-  members?: Record<string, TornMember>
-  error?: { error: string; code: number }
-}
+import type {
+  BattleStatContributor,
+  FairFightObservation,
+} from '#/models/battle-stats'
+import type { TornFactionMember, TornFactionResponse } from '#/models/torn'
+import type { TravelEstimate } from '#/models/travel'
+import type {
+  EnemyFaction,
+  FactionMembersResponse,
+  WarTarget,
+} from '#/models/war-hospital'
 
 const THIRTY_MINUTES = 30 * 60 * 1000
 
@@ -169,7 +161,7 @@ export const Route = createFileRoute('/api/(war-hospital)/faction-members')({
               travelTrackingReason: travelTracking.reason,
               statusObservedAt,
               fetchedAt: now,
-            },
+            } satisfies FactionMembersResponse,
             { headers: { 'Cache-Control': 'no-store' } },
           )
         } catch (error) {
@@ -194,12 +186,12 @@ export const Route = createFileRoute('/api/(war-hospital)/faction-members')({
 
 function formatMember(
   id: string,
-  member: TornMember,
+  member: TornFactionMember,
   now: number,
   fairFightObservations: FairFightObservation[],
   battleStatContributors: BattleStatContributor[],
   travel: TravelEstimate | null,
-) {
+): WarTarget {
   const state = member.status.state ?? 'Unknown'
   const releaseAt = (member.status.until ?? 0) * 1000
   const status =

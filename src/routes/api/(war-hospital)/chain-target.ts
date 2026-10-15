@@ -1,25 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type { ChainTargetResponse } from '#/lib/war-hospital/chain-target'
 import { fetchTorn } from '#/lib/torn/torn-api.server'
-
-type Attack = {
-  attacker_id?: number
-  defender_id?: number
-  timestamp_ended?: number
-  result?: string
-  is_interrupted?: boolean
-  modifiers?: { group_attack?: number }
-}
-
-type Profile = {
-  player_id?: number
-  name?: string
-  level?: number
-  status?: { state?: string }
-  faction?: { faction_id?: number }
-  attacks?: Record<string, Attack> | Attack[]
-  error?: { error: string }
-}
+import type { TornAttack, TornAttacksProfile } from '#/models/torn'
+import type { ChainTargetResponse } from '#/models/war-hospital'
 
 const RECENT_WINDOW = 14 * 24 * 60 * 60 * 1000
 const MAX_PROFILE_CHECKS = 10
@@ -34,13 +16,17 @@ async function loadProfile(
   const url = new URL(`https://api.torn.com/user/${id}`)
   url.searchParams.set('selections', selections)
   url.searchParams.set('key', apiKey)
-  const { data: profile, fetchedAt } = await fetchTorn<Profile>(url, {
-    maxAgeMs: id ? 60000 : 10000,
-    signal,
-    // Keep unavailable players out of repeated searches, but always recheck
-    // available players before offering an attack.
-    cacheWhen: (data) => !id || (data as Profile).status?.state !== 'Okay',
-  })
+  const { data: profile, fetchedAt } = await fetchTorn<TornAttacksProfile>(
+    url,
+    {
+      maxAgeMs: id ? 60000 : 10000,
+      signal,
+      // Keep unavailable players out of repeated searches, but always recheck
+      // available players before offering an attack.
+      cacheWhen: (data) =>
+        !id || (data as TornAttacksProfile).status?.state !== 'Okay',
+    },
+  )
   return { profile, fetchedAt }
 }
 
@@ -78,7 +64,7 @@ export const Route = createFileRoute('/api/(war-hospital)/chain-target')({
 
           const now = Date.now()
           const excludeId = new URL(request.url).searchParams.get('excludeId')
-          const latestFights = new Map<number, Attack>()
+          const latestFights = new Map<number, TornAttack>()
           for (const attack of Object.values(self.attacks)) {
             if (
               attack.attacker_id !== self.player_id ||

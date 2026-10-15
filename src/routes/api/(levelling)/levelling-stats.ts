@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { estimateBattleStats } from '#/lib/battle-stats/estimator'
 import { loadFairFightEvidence } from '#/lib/battle-stats/fair-fight-evidence.server'
 import { syncSharedEvidence } from '#/lib/battle-stats/shared-evidence.server'
-import type { LevellingStatsResponse } from '#/lib/levelling/levelling'
+import type { LevellingStatsResponse } from '#/models/levelling'
 
 const headers = { 'Cache-Control': 'no-store' }
 // Enough for the largest tier, including players added in tornintel.

@@ -1,28 +1,16 @@
 import { createHash } from 'node:crypto'
-import type { FfScouterEstimate } from '../levelling/levelling'
+import type {
+  FfScouterErrorBody,
+  FfScouterEstimate,
+  FfScouterPlayerStats,
+  FfScouterTarget,
+} from '#/models/ffscouter'
 
 const BASE_URL = 'https://ffscouter.com/api/v1'
 // FF Scouter accepts up to 205 IDs per request and caches results for five minutes.
 const MAX_STATS_TARGETS = 205
 const STATS_MAX_AGE = 5 * 60 * 1000
 const MAX_CACHE_ENTRIES = 5000
-
-type FfScouterErrorBody = { code?: number; error?: string }
-
-type PlayerStats = {
-  player_id: number
-  fair_fight: number | null
-  bs_estimate: number | null
-  bs_estimate_human: string | null
-  last_updated: number | null
-}
-
-export type FfScouterTarget = PlayerStats & {
-  name: string
-  level: number
-  last_action: number | null
-  hospital_until?: number | null
-}
 
 export class FfScouterError extends Error {
   constructor(
@@ -61,7 +49,7 @@ async function callFfScouter<T>(
   return body as T
 }
 
-function toEstimate(stats: PlayerStats): FfScouterEstimate | null {
+function toEstimate(stats: FfScouterPlayerStats): FfScouterEstimate | null {
   if (stats.bs_estimate == null) return null
   return {
     total: stats.bs_estimate,
@@ -96,7 +84,7 @@ export function createFfScouterClient() {
     }
     for (let start = 0; start < missing.length; start += MAX_STATS_TARGETS) {
       const batch = missing.slice(start, start + MAX_STATS_TARGETS)
-      const stats = await callFfScouter<PlayerStats[]>(
+      const stats = await callFfScouter<FfScouterPlayerStats[]>(
         '/get-stats',
         { key: apiKey, targets: batch.join(',') },
         signal,

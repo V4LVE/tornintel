@@ -6,7 +6,7 @@ import { Client } from 'pg'
 import { db } from '#/db'
 import { sharedFairFightObservations } from '#/db/schema'
 import { sharedEvidenceRepository } from './shared-evidence.server'
-import type { SharedObservation } from './shared-evidence.server'
+import type { SharedObservation } from '#/models/battle-stats'
 
 test(
   'PostgreSQL preserves the original hit and makes it visible on another connection',

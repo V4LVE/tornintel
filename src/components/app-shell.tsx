@@ -3,6 +3,7 @@ import type { LinkProps } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useSession } from '#/components/session'
 import { ThemeToggle } from '#/components/theme-toggle'
+import { LandingPage } from '#/components/landing-page'
 
 type NavItem = {
   label: string
@@ -21,22 +22,12 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         icon: '+',
         link: { to: '/', activeOptions: { exact: true, includeHash: true } },
       },
-      {
-        label: 'Target list',
-        icon: '#',
-        link: {
-          to: '/',
-          hash: 'targets',
-          activeOptions: { exact: true, includeHash: true },
-        },
-      },
       { label: 'War payout', icon: '$', link: { to: '/payouts' } },
       {
         label: 'War deals',
         icon: '↔',
         link: { to: '/war-deals' },
       },
-      { label: 'Intel reports', icon: 'i' },
     ],
   },
   {
@@ -62,11 +53,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   })
 
   if (session.status === 'loading' || (session.isVerifying && !session.user)) {
-    return <ApiKeyGate isLoading />
+    return <LandingPage isLoading />
   }
   if (!session.user) {
     return (
-      <ApiKeyGate
+      <LandingPage
         error={session.error}
         onSubmit={(key) => void session.connect(key)}
       />
@@ -174,56 +165,6 @@ export function PageHeading({
       </div>
       {actions}
     </div>
-  )
-}
-
-function ApiKeyGate({
-  error = '',
-  isLoading = false,
-  onSubmit,
-}: {
-  error?: string
-  isLoading?: boolean
-  onSubmit?: (apiKey: string) => void
-}) {
-  return (
-    <main className="api-key-gate">
-      <section className="api-key-card">
-        <div className="brand">
-          <span className="brand-mark">TI</span>
-          <span>tornintel</span>
-        </div>
-        <h1>{isLoading ? 'Checking your key…' : 'Connect to Torn'}</h1>
-        <p>
-          Enter a Torn API key to use tornintel. A Limited key also lets us use
-          your recent Fair Fight history for battle-stat estimates shared with
-          other tornintel users. Your key stays in this browser and is sent to
-          the server to request Torn data.
-        </p>
-        {!isLoading && onSubmit && (
-          <form
-            className="api-key-login"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const formData = new FormData(event.currentTarget)
-              onSubmit(String(formData.get('apiKey') ?? ''))
-            }}
-          >
-            <label htmlFor="login-api-key">Torn API key</label>
-            <input
-              id="login-api-key"
-              name="apiKey"
-              type="password"
-              autoComplete="off"
-              autoFocus
-              placeholder="Paste a Limited Torn API key"
-            />
-            {error && <p className="login-error">{error}</p>}
-            <button type="submit">Connect</button>
-          </form>
-        )}
-      </section>
-    </main>
   )
 }
 

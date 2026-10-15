@@ -1397,7 +1397,8 @@ td {
   color: var(--c-82929d);
   font-size: 11px;
 }
-.payout-inputs input {
+.payout-inputs input,
+.payout-inputs select {
   width: 180px;
   height: 36px;
   background: var(--c-111d26);
@@ -1405,6 +1406,33 @@ td {
   border-radius: 4px;
   color: var(--c-e8edef);
   padding: 0 10px;
+}
+.payout-include-outside {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  cursor: pointer;
+  color: var(--c-aab7bd);
+  font-size: 13px;
+}
+.payout-include-outside input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--c-f28b71);
+  cursor: pointer;
+}
+.payout-inputs input:disabled {
+  opacity: 0.5;
+}
+.payout-note,
+.payout-warning {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--c-95a6b2);
+}
+.payout-warning {
+  color: var(--c-f28b71);
 }
 .payout-summary span {
   min-width: 150px;
@@ -1514,6 +1542,7 @@ td {
   color: var(--c-aab7bd);
 }
 .deal-page input,
+.deal-page select,
 .deal-page textarea {
   width: 100%;
   min-width: 0;
@@ -1525,6 +1554,7 @@ td {
   font: inherit;
 }
 .deal-page input:focus-visible,
+.deal-page select:focus-visible,
 .deal-page textarea:focus-visible,
 .deal-page button:focus-visible {
   outline: 2px solid var(--c-f18b72);

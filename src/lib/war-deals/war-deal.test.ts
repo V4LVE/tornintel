@@ -57,6 +57,50 @@ test('a provided rate without an item price quotes the value and requests item a
   assert.match(message, /Contact Alex for med-out partners/)
 })
 
+test('fixed cash pays the loser the same amount for either outcome and any score', () => {
+  for (const weWin of [true, false]) {
+    for (const losingScore of [1000, 3000]) {
+      const message = generateDealMessage({
+        ...options,
+        weWin,
+        losingScore,
+        fixedCash: 25000000,
+      })
+      const recipient = weWin ? 'Other faction' : 'NPC'
+      assert.ok(
+        message.includes(
+          `${recipient} receives a fixed cash compensation of $25,000,000, regardless of the final war score.`,
+        ),
+      )
+      assert.match(message, /Payment: Within 24 hours\./)
+      assert.doesNotMatch(
+        message,
+        /per war score point|Xanax|valuation|rounding|report to confirm the score/,
+      )
+    }
+  }
+})
+
+test('blank fixed cash omits compensation even when a previous rate is set', () => {
+  const message = generateDealMessage({
+    ...options,
+    fixedCash: 0,
+    paymentTiming: '',
+  })
+  assert.doesNotMatch(message, /Payment:|compensation|receives|Xanax/)
+})
+
+test('fixed cash compensation can be supplied without payment timing', () => {
+  const message = generateDealMessage({
+    ...options,
+    fixedCash: 25000000,
+    rate: 0,
+    paymentTiming: '',
+  })
+  assert.match(message, /fixed cash compensation of \$25,000,000/)
+  assert.doesNotMatch(message, /Payment:/)
+})
+
 test('blank payment fields omit all payment wording even with fetched item prices', () => {
   for (const weWin of [true, false]) {
     const message = generateDealMessage({

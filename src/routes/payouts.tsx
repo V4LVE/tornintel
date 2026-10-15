@@ -8,6 +8,7 @@ import {
   TableToolbar,
 } from '#/components/table-controls'
 import { useTableView } from '#/lib/hooks/use-table-view'
+import { calculatePayouts } from '#/lib/payouts/payouts'
 import type {
   PayoutPlayer,
   PayoutPlayersResponse,
@@ -24,6 +25,7 @@ function Payouts() {
   const [includeNonWar, setIncludeNonWar] = useState(true)
   const [earnings, setEarnings] = useState(0)
   const [rate, setRate] = useState(0)
+  const [outsideRate, setOutsideRate] = useState(0)
   const [paid, setPaid] = useState<string[]>([])
   const [error, setError] = useState('')
   useEffect(() => {
@@ -37,6 +39,7 @@ function Payouts() {
           key,
           controller.signal,
         )
+        if (controller.signal.aborted) return
         setWars(data.wars)
         setWarId((current) => current || String(data.wars[0]?.id ?? ''))
       } catch (requestError) {
@@ -58,6 +61,7 @@ function Payouts() {
           key,
           controller.signal,
         )
+        if (controller.signal.aborted) return
         setError('')
         setPlayers(data.players)
       } catch (requestError) {
@@ -70,23 +74,11 @@ function Payouts() {
       controller.abort()
     }
   }, [warId])
-  const totalHits = players.reduce(
-    (sum, player) =>
-      sum + player.warHits + (includeNonWar ? player.nonWarHits : 0),
-    0,
+  const calculation = useMemo(
+    () => calculatePayouts(players, earnings, rate, outsideRate, includeNonWar),
+    [players, earnings, rate, outsideRate, includeNonWar],
   )
-  const maxRate = totalHits ? earnings / totalHits : 0
-  const appliedRate = Math.min(rate, maxRate)
-  const payouts = useMemo(
-    () =>
-      players.map((player) => ({
-        ...player,
-        amount:
-          (player.warHits + (includeNonWar ? player.nonWarHits : 0)) *
-          appliedRate,
-      })),
-    [appliedRate, includeNonWar, players],
-  )
+  const payouts = calculation.payouts
   const payoutView = useTableView(payouts, {
     search: (player) => [player.name, player.id],
     filters: [
@@ -105,8 +97,6 @@ function Payouts() {
       payout: (player) => player.amount,
     },
   })
-  const totalPaid = payouts.reduce((sum, player) => sum + player.amount, 0)
-  const remainder = Math.max(0, earnings - totalPaid)
   function markPaid(player: (typeof payouts)[number]) {
     void navigator.clipboard.writeText(String(Math.floor(player.amount)))
     window.open(
@@ -121,8 +111,9 @@ function Payouts() {
   return (
     <section className="payout-page">
       <PageHeading eyebrow="RANKED WAR" title="War payout">
-        Select a ranked war. Non-war hits are attacks during that war against
-        targets outside the opposing faction.
+        Select a ranked war. Outside chain hits are successful attacks during
+        that war against targets outside the opposing faction that contribute to
+        your faction chain.
       </PageHeading>
       <div className="payout-inputs">
         <label>
@@ -153,38 +144,59 @@ function Payouts() {
           />
         </label>
         <label>
-          Pay per hit
+          Pay per war hit ($)
           <input
             type="number"
             min="0"
-            max={maxRate}
             value={rate || ''}
             onChange={(e) => setRate(Number(e.target.value))}
           />
         </label>
+        <label>
+          Pay per outside chain hit ($)
+          <input
+            type="number"
+            min="0"
+            disabled={!includeNonWar}
+            value={outsideRate || ''}
+            onChange={(event) => setOutsideRate(Number(event.target.value))}
+          />
+        </label>
       </div>
-      <label className="include-non-war">
+      <label className="payout-include-outside">
         <input
           type="checkbox"
           checked={includeNonWar}
           onChange={(e) => setIncludeNonWar(e.target.checked)}
         />{' '}
-        Include non-war chain-support hits
+        Include outside chain-support hits
       </label>
-      {rate > maxRate && (
-        <p className="settings-error">
-          Pay per hit was capped at {money(maxRate)}.
+      <p className="payout-note">
+        Outside hits use their own fixed rate per hit. Their payments are
+        reserved first, then war-hit payouts use the remaining earnings. Rates
+        are reduced if needed to stay within earnings; player payouts round down
+        to whole dollars. Unchecking outside hits excludes them from payouts and
+        the included hit count.
+      </p>
+      {calculation.capped && (
+        <p className="payout-warning" role="status">
+          Payouts were capped to your earnings. Applied rates:{' '}
+          {money(calculation.appliedWarRate)} per war hit and{' '}
+          {money(calculation.appliedOutsideRate)} per outside chain hit.
         </p>
       )}
       <div className="payout-summary">
         <span>
-          Total hits <b>{totalHits}</b>
+          Included hits <b>{calculation.warHits + calculation.outsideHits}</b>
         </span>
         <span>
-          Paid <b>{money(totalPaid)}</b>
+          Outside hits included <b>{calculation.outsideHits}</b>
         </span>
         <span>
-          Left over <b>{money(remainder)}</b>
+          Planned payout <b>{money(calculation.total)}</b>
+        </span>
+        <span>
+          Left over <b>{money(calculation.remainder)}</b>
         </span>
       </div>
       {error ? (
@@ -203,7 +215,7 @@ function Payouts() {
                     WAR HITS
                   </SortHeader>
                   <SortHeader view={payoutView} column="nonWarHits">
-                    NON-WAR HITS
+                    OUTSIDE CHAIN HITS
                   </SortHeader>
                   <SortHeader view={payoutView} column="payout">
                     PAYOUT

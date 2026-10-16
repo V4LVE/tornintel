@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import {
+  bundledPlayers,
+  levellingListRepository,
+} from '../levelling/levelling.server'
 import { Route } from '../../routes/api/(war-hospital)/chain-target'
+import type { TestContext } from 'node:test'
+import type { LevellingListChange } from '#/models/levelling'
 
 const handlers = Route.options.server?.handlers
 if (!handlers || typeof handlers === 'function' || !handlers.GET) {
@@ -18,181 +24,176 @@ async function invoke(key = 'test-key', query = '') {
   return response
 }
 
-test('requires an API key before accessing Torn', async () => {
+function mockList(context: TestContext, ids: number[]) {
+  const originalUrl = process.env.DATABASE_URL
+  process.env.DATABASE_URL = 'postgres://test'
+  context.after(() => {
+    if (originalUrl === undefined) delete process.env.DATABASE_URL
+    else process.env.DATABASE_URL = originalUrl
+  })
+  const change = (playerId: number, removed: boolean): LevellingListChange => ({
+    playerId,
+    name: `Player ${playerId}`,
+    level: 25,
+    totalEstimate: null,
+    removed,
+    addedById: null,
+    addedByName: null,
+  })
+  context.mock.method(levellingListRepository, 'load', async () => [
+    ...bundledPlayers.map((player) => change(player.id, true)),
+    ...ids.map((id) => change(id, false)),
+  ])
+}
+
+const self = {
+  player_id: 100,
+  status: { state: 'Okay' },
+  faction: { faction_id: 500 },
+}
+
+function profile(id: number, state = 'Okay', factionId = 600) {
+  return {
+    player_id: id,
+    name: `Player ${id}`,
+    level: 25,
+    status: { state },
+    faction: { faction_id: factionId },
+  }
+}
+
+test('requires an API key before accessing Torn', async (context) => {
+  context.mock.method(globalThis, 'fetch', () => {
+    assert.fail('Must not call Torn without a key')
+  })
   const response = await invoke('')
   assert.equal(response.status, 401)
   assert.match((await response.json()).error, /API key/)
 })
 
-test('selects a recent solo win, verifies availability, and excludes unsafe targets', async () => {
-  const originalFetch = globalThis.fetch
-  const now = Math.floor(Date.now() / 1000) - 1
+test('uses shared list changes without attacks access and excludes unsafe targets', async (context) => {
+  mockList(context, [100, 2, 3, 4, 5, 6, 7, 1])
+  context.mock.method(Math, 'random', () => 0.999)
   const calls: string[] = []
-  const fight = (id: number, extra = {}) => ({
-    attacker_id: 100,
-    defender_id: id,
-    timestamp_ended: now,
-    result: 'Hospitalized',
-    modifiers: { group_attack: 1 },
-    ...extra,
-  })
-  globalThis.fetch = async (input) => {
+  context.mock.method(globalThis, 'fetch', async (input: URL) => {
     const url = new URL(String(input))
-    assert.equal(url.searchParams.get('key'), 'test-key')
     calls.push(url.pathname)
     if (url.pathname === '/user/') {
-      return Response.json({
-        player_id: 100,
-        status: { state: 'Okay' },
-        faction: { faction_id: 500 },
-        attacks: {
-          win: fight(1),
-          hospital: fight(2),
-          traveling: fight(3),
-          abroad: fight(4),
-          factionMate: fight(5),
-          old: fight(6, { timestamp_ended: now - 15 * 86400 }),
-          incoming: fight(7, { attacker_id: 7, defender_id: 100 }),
-          group: fight(8, { modifiers: { group_attack: 2 } }),
-          interrupted: fight(9, { is_interrupted: true }),
-          priorWin: fight(10, { timestamp_ended: now - 10 }),
-          laterLoss: fight(10, { result: 'Lost' }),
-          excluded: fight(11),
-        },
-      })
+      assert.equal(url.searchParams.get('selections'), 'profile')
+      return Response.json(self)
     }
     const id = Number(url.pathname.split('/').at(-1))
-    assert.ok([1, 2, 3, 4, 5].includes(id))
-    return Response.json({
-      player_id: id,
-      name: `Player ${id}`,
-      level: 25,
-      status: {
-        state: { 2: 'Hospital', 3: 'Traveling', 4: 'Abroad' }[id] ?? 'Okay',
-      },
-      faction: { faction_id: id === 5 ? 500 : 600 },
-    })
-  }
-  try {
-    const response = await invoke('test-key', '?excludeId=11')
-    const payload = await response.json()
-    assert.equal(response.status, 200)
-    assert.equal(response.headers.get('cache-control'), 'no-store')
-    assert.deepEqual(payload.target, {
-      id: 1,
-      name: 'Player 1',
-      level: 25,
-      lastWonAt: now * 1000,
-    })
-    assert.ok(payload.fetchedAt > 0)
-    assert.equal(new Set(calls).size, calls.length)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
+    assert.ok([1, 2, 3, 4, 5, 6].includes(id))
+    if (id === 6)
+      return Response.json({ error: { code: 6, error: 'Incorrect ID' } })
+    return Response.json(
+      profile(
+        id,
+        { 2: 'Hospital', 3: 'Traveling', 4: 'Abroad' }[id] ?? 'Okay',
+        id === 5 ? 500 : 600,
+      ),
+    )
+  })
+  const response = await invoke('list-key', '?excludeId=7')
+  const payload = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  assert.deepEqual(payload.target, { id: 1, name: 'Player 1', level: 25 })
+  assert.ok(payload.fetchedAt > 0)
+  assert.equal(new Set(calls).size, calls.length)
+  assert.equal(calls.length, 7)
 })
 
-test('returns an empty state when no qualifying wins exist', async () => {
-  const originalFetch = globalThis.fetch
-  globalThis.fetch = async () =>
-    Response.json({
-      player_id: 100,
-      status: { state: 'Okay' },
-      attacks: {},
-    })
-  try {
-    const response = await invoke('empty-pool-key')
-    const payload = await response.json()
-    assert.equal(response.status, 200)
-    assert.equal(payload.target, null)
-    assert.match(payload.message, /No other recent wins/)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
+test('returns an empty state when the shared list has no candidates', async (context) => {
+  mockList(context, [])
+  context.mock.method(globalThis, 'fetch', async () => Response.json(self))
+  const response = await invoke('empty-list-key')
+  const payload = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(payload.target, null)
+  assert.match(payload.message, /levelling list/)
 })
 
-test('surfaces Torn errors without returning a target', async () => {
-  const originalFetch = globalThis.fetch
-  globalThis.fetch = async () =>
-    Response.json({ error: { error: 'Too many requests' } })
-  try {
-    const response = await invoke('torn-error-key')
-    assert.equal(response.status, 502)
-    assert.equal((await response.json()).error, 'Too many requests')
-  } finally {
-    globalThis.fetch = originalFetch
-  }
+test('surfaces target key errors instead of skipping them', async (context) => {
+  mockList(context, [1])
+  context.mock.method(globalThis, 'fetch', async (input: URL) =>
+    Response.json(
+      new URL(String(input)).pathname === '/user/'
+        ? self
+        : { error: { code: 2, error: 'Incorrect key' } },
+    ),
+  )
+  const response = await invoke('torn-error-key')
+  assert.equal(response.status, 502)
+  assert.equal((await response.json()).error, 'Incorrect key')
 })
 
-test('caps profile checks when all candidates are unavailable', async () => {
-  const originalFetch = globalThis.fetch
-  const now = Math.floor(Date.now() / 1000) - 1
+test('caps profile checks when list candidates are unavailable', async (context) => {
+  mockList(
+    context,
+    Array.from({ length: 30 }, (_, index) => index + 1),
+  )
   let profileChecks = 0
-  globalThis.fetch = async (input) => {
-    const url = new URL(String(input))
-    if (url.pathname === '/user/') {
-      return Response.json({
-        player_id: 100,
-        status: { state: 'Okay' },
-        attacks: Array.from({ length: 30 }, (_, index) => ({
-          attacker_id: 100,
-          defender_id: index + 1,
-          timestamp_ended: now,
-          result: 'Mugged',
-        })),
-      })
-    }
+  context.mock.method(globalThis, 'fetch', async (input: URL) => {
+    if (new URL(String(input)).pathname === '/user/') return Response.json(self)
     profileChecks++
     return Response.json({ status: { state: 'Hospital' } })
-  }
-  try {
-    const response = await invoke('unavailable-pool-key')
-    assert.equal((await response.json()).target, null)
-    assert.equal(profileChecks, 10)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
+  })
+  const response = await invoke('unavailable-list-key')
+  assert.equal((await response.json()).target, null)
+  assert.equal(profileChecks, 10)
 })
 
-test('reuses the hitter history, rechecks ready players, and remembers unavailable players', async () => {
-  const originalFetch = globalThis.fetch
-  const now = Math.floor(Date.now() / 1000) - 1
+test('rechecks ready targets and caches unavailable profiles', async (context) => {
+  mockList(context, [1])
   let selfCalls = 0
   let targetCalls = 0
-  globalThis.fetch = async (input) => {
-    const url = new URL(String(input))
-    if (url.pathname === '/user/') {
+  context.mock.method(globalThis, 'fetch', async (input: URL) => {
+    if (new URL(String(input)).pathname === '/user/') {
       selfCalls++
-      return Response.json({
-        player_id: 100,
-        status: { state: 'Okay' },
-        attacks: [
-          {
-            attacker_id: 100,
-            defender_id: 1,
-            timestamp_ended: now,
-            result: 'Mugged',
-          },
-        ],
-      })
+      return Response.json(self)
     }
     targetCalls++
-    return Response.json({
-      player_id: 1,
-      name: 'Target',
-      level: 25,
-      status: { state: targetCalls === 1 ? 'Okay' : 'Hospital' },
-    })
-  }
-  try {
-    const first = await invoke('chain-cache-key')
-    assert.equal((await first.json()).target.id, 1)
-    const second = await invoke('chain-cache-key')
-    assert.equal((await second.json()).target, null)
-    const third = await invoke('chain-cache-key')
-    assert.equal((await third.json()).target, null)
-    assert.equal(selfCalls, 1)
-    assert.equal(targetCalls, 2)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
+    return Response.json(profile(1, targetCalls === 1 ? 'Okay' : 'Hospital'))
+  })
+  assert.equal((await (await invoke('chain-cache-key')).json()).target.id, 1)
+  assert.equal((await (await invoke('chain-cache-key')).json()).target, null)
+  assert.equal((await (await invoke('chain-cache-key')).json()).target, null)
+  assert.equal(selfCalls, 1)
+  assert.equal(targetCalls, 2)
+})
+
+test('uses the bundled list with a warning when storage is unconfigured', async (context) => {
+  const originalUrl = process.env.DATABASE_URL
+  delete process.env.DATABASE_URL
+  context.after(() => {
+    if (originalUrl !== undefined) process.env.DATABASE_URL = originalUrl
+  })
+  context.mock.method(levellingListRepository, 'load', () => {
+    assert.fail('Must not access the database')
+  })
+  context.mock.method(globalThis, 'fetch', async (input: URL) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/user/') return Response.json(self)
+    const id = Number(url.pathname.split('/').at(-1))
+    assert.ok(bundledPlayers.some((player) => player.id === id))
+    return Response.json(profile(id))
+  })
+  const response = await invoke('bundled-list-key')
+  const payload = await response.json()
+  assert.equal(response.status, 200)
+  assert.ok(payload.target)
+  assert.match(payload.warning, /storage is not configured/)
+})
+
+test('rejects searching while the hitter is unavailable', async (context) => {
+  let calls = 0
+  context.mock.method(globalThis, 'fetch', async () => {
+    calls++
+    return Response.json({ ...self, status: { state: 'Traveling' } })
+  })
+  const response = await invoke('traveling-hitter-key')
+  assert.equal(response.status, 502)
+  assert.match((await response.json()).error, /in Torn/)
+  assert.equal(calls, 1)
 })

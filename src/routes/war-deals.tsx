@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeading } from '#/components/app-shell'
+import { useSession } from '#/components/session'
 import {
   generateDealMessage,
   money,
@@ -15,11 +16,14 @@ export const Route = createFileRoute('/war-deals')({
 })
 
 function WarDeals() {
+  const { apiKey } = useSession()
   const [ourName, setOurName] = useState('NPC')
   const [theirName, setTheirName] = useState('Your faction')
   const [ourScore, setOurScore] = useState(8500)
   const [theirScore, setTheirScore] = useState(3000)
   const [rate, setRate] = useState(0)
+  const [useFixedCash, setUseFixedCash] = useState(false)
+  const [fixedCash, setFixedCash] = useState(0)
   const [itemName, setItemName] = useState('Xanax')
   const [itemValue, setItemValue] = useState(0)
   const [offlineMinutes, setOfflineMinutes] = useState(15)
@@ -40,14 +44,13 @@ function WarDeals() {
       setLoading(true)
       setLoadError('')
       try {
-        const key = localStorage.getItem('tornintel.apiKey') ?? ''
-        if (!key)
+        if (!apiKey)
           throw new Error(
             'Connect a Torn API key in Settings to automatically load war details, rewards, and prices. You can also fill in values manually.',
           )
         const response = await fetch(
           `/api/war-deal-defaults${opponent ? `?opponentId=${encodeURIComponent(opponent)}` : ''}`,
-          { headers: { 'X-Torn-Api-Key': key }, signal },
+          { cache: 'no-store', headers: { 'X-Torn-Api-Key': apiKey }, signal },
         )
         const data = (await response.json()) as DealDefaults & {
           error?: string
@@ -79,7 +82,7 @@ function WarDeals() {
         if (!signal?.aborted) setLoading(false)
       }
     },
-    [],
+    [apiKey],
   )
   useEffect(() => {
     const controller = new AbortController()
@@ -90,7 +93,7 @@ function WarDeals() {
   const winningScore = Math.max(ourScore, theirScore)
   const losingScore = Math.min(ourScore, theirScore)
   const validScores = winningScore > losingScore && losingScore > 0
-  const compensation = losingScore * rate
+  const compensation = useFixedCash ? fixedCash : losingScore * rate
   const hasPricing = caches.some(
     (cache) => cache.price > 0 && cache.ours + cache.theirs > 0,
   )
@@ -113,6 +116,7 @@ function WarDeals() {
     winningScore,
     losingScore,
     rate,
+    fixedCash: useFixedCash ? fixedCash : undefined,
     itemName,
     itemValue,
     paymentTiming,
@@ -351,51 +355,74 @@ function WarDeals() {
       <section className="panel deal-panel" aria-labelledby="terms-heading">
         <h2 id="terms-heading">Optional compensation & terms</h2>
         <p className="deal-note">
-          Compensation uses the losing faction's score, whichever side wins.
-          Leave the rate and payment timing blank to omit payment information
-          from the messages. Item prices load automatically; you can override
-          them.
+          The losing faction receives compensation, whichever side wins. Choose
+          a rate per losing score point or a fixed cash amount. Leave the amount
+          and payment timing blank to omit payment information from the
+          messages. Item prices load automatically for score-based compensation;
+          you can override them.
         </p>
         <details>
           <summary>Add payment information or customize terms</summary>
           <div className="deal-input-grid">
-            <NumberField
-              label="Compensation per losing score point ($)"
-              value={rate}
-              onChange={setRate}
-            />
             <label>
-              Compensation item
-              <input
-                value={itemName}
-                onChange={(e) => {
-                  edited.current.add('item')
-                  setItemName(e.target.value)
-                  setItemValue(
-                    defaults?.items.find(
-                      (item) =>
-                        item.name.toLowerCase() ===
-                        e.target.value.trim().toLowerCase(),
-                    )?.price ?? 0,
-                  )
-                }}
-                list="compensation-items"
-                maxLength={100}
-              />
+              Compensation method
+              <select
+                value={useFixedCash ? 'fixed' : 'score'}
+                onChange={(event) =>
+                  setUseFixedCash(event.target.value === 'fixed')
+                }
+              >
+                <option value="score">Per losing score point</option>
+                <option value="fixed">Fixed cash amount</option>
+              </select>
             </label>
-            <datalist id="compensation-items">
-              {defaults?.items.map((item) => (
-                <option key={item.id} value={item.name} />
-              ))}
-            </datalist>
-            <NumberField
-              label="Agreed value per item ($)"
-              value={itemValue}
-              onChange={(value) => {
-                edited.current.add('item')
-                setItemValue(value)
-              }}
-            />
+            {useFixedCash ? (
+              <NumberField
+                label="Fixed cash compensation ($)"
+                value={fixedCash}
+                onChange={setFixedCash}
+              />
+            ) : (
+              <>
+                <NumberField
+                  label="Compensation per losing score point ($)"
+                  value={rate}
+                  onChange={setRate}
+                />
+                <label>
+                  Compensation item
+                  <input
+                    value={itemName}
+                    onChange={(e) => {
+                      edited.current.add('item')
+                      setItemName(e.target.value)
+                      setItemValue(
+                        defaults?.items.find(
+                          (item) =>
+                            item.name.toLowerCase() ===
+                            e.target.value.trim().toLowerCase(),
+                        )?.price ?? 0,
+                      )
+                    }}
+                    list="compensation-items"
+                    maxLength={100}
+                  />
+                </label>
+                <datalist id="compensation-items">
+                  {defaults?.items.map((item) => (
+                    <option key={item.id} value={item.name} />
+                  ))}
+                </datalist>
+                <NumberField
+                  label="Agreed value per item ($)"
+                  value={itemValue}
+                  onChange={(value) => {
+                    edited.current.add('item')
+                    setItemValue(value)
+                  }}
+                />
+              </>
+            )}
             <NumberField
               label="Offliner minimum (minutes)"
               value={offlineMinutes}
@@ -421,13 +448,14 @@ function WarDeals() {
             </label>
           </div>
         </details>
-        {rate > 0 && (
+        {compensation > 0 && (
           <p className="deal-note">
-            Planned compensation:{' '}
-            <b>{rate > 0 ? money(compensation) : 'Rate not set'}</b>
-            {rate > 0 && itemValue > 0
-              ? ` = ${number(Math.floor(compensation / itemValue))} ${itemName || 'items'} + ${money(compensation % itemValue)} cash. Whole items round down; the cash remainder preserves the agreed value.`
-              : ''}
+            Planned compensation: <b>{money(compensation)}</b>
+            {useFixedCash
+              ? ' cash, regardless of the final war score.'
+              : itemValue > 0
+                ? ` = ${number(Math.floor(compensation / itemValue))} ${itemName || 'items'} + ${money(compensation % itemValue)} cash. Whole items round down; the cash remainder preserves the agreed value.`
+                : ''}
           </p>
         )}
       </section>

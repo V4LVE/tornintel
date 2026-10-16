@@ -29,6 +29,7 @@ export function generateDealMessage(options: {
   losingScore: number
   weWin: boolean
   rate: number
+  fixedCash?: number
   itemName: string
   itemValue: number
   paymentTiming: string
@@ -36,15 +37,19 @@ export function generateDealMessage(options: {
   extraTerms: string
 }) {
   const { winningScore, losingScore, weWin, rate, itemValue } = options
+  const isFixedCash = options.fixedCash !== undefined
   const ours = options.ourName.trim() || 'NPC'
   const theirs = options.theirName.trim() || 'Your faction'
   const winner = weWin ? ours : theirs
   const loser = weWin ? theirs : ours
-  const compensation = losingScore * rate
+  const compensation = options.fixedCash ?? losingScore * rate
   const items = itemValue > 0 ? Math.floor(compensation / itemValue) : 0
   const remainder = itemValue > 0 ? compensation - items * itemValue : 0
-  const compensationTerm =
-    rate > 0 && itemValue > 0 && options.itemName.trim()
+  const compensationTerm = isFixedCash
+    ? compensation > 0
+      ? `${loser} receives a fixed cash compensation of ${money(compensation)}, regardless of the final war score.`
+      : ''
+    : rate > 0 && itemValue > 0 && options.itemName.trim()
       ? `${loser} receives ${number(items)} ${options.itemName.trim()}${remainder > 0 ? ` plus ${money(remainder)} cash for rounding` : ''}, based on ${money(rate)} per war score point actually scored by the losing faction (item valuation: ${money(itemValue)} each). At ${number(losingScore)} score, the planned compensation is ${money(compensation)}.`
       : rate > 0
         ? `${loser} receives compensation worth ${money(rate)} per war score point actually scored by the losing faction. At ${number(losingScore)} score, the planned compensation is ${money(compensation)}. Item type and valuation to be agreed before the war.`
@@ -52,7 +57,7 @@ export function generateDealMessage(options: {
   const paymentTerms = [
     compensationTerm,
     options.paymentTiming.trim()
-      ? `Payment: ${options.paymentTiming.trim()}, using the final war report to confirm the score.`
+      ? `Payment: ${options.paymentTiming.trim()}${isFixedCash ? '.' : ', using the final war report to confirm the score.'}`
       : '',
   ]
     .filter(Boolean)

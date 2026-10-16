@@ -122,8 +122,18 @@ export type TornAttacksProfile = {
 }
 
 export type TornFactionAttack = {
-  attacker?: { id?: number; name?: string }
+  id: number
+  ended: number
+  attacker: { id: number; name: string; faction: { id: number } | null } | null
+  result: string
+  chain: number | null
+  is_interrupted: boolean
   is_ranked_war?: boolean
+}
+
+export type TornFactionAttacksResponse = {
+  attacks: TornFactionAttack[]
+  _metadata: { links: { next: string | null } }
 }
 
 export type TornRankedWarMembersReport = {
@@ -132,7 +142,7 @@ export type TornRankedWarMembersReport = {
     end?: number
     factions?: Array<{
       id?: number
-      members?: Record<string, { name?: string; attacks?: number }>
+      members?: Array<{ id: number; name: string; attacks: number }>
     }>
   }
 }

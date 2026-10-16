@@ -201,7 +201,7 @@ Everything must work without `DATABASE_URL`. Each storage feature checks `proces
 - **Torn links:** `https://www.torn.com/page.php?sid=attack&user2ID=<id>` and `https://www.torn.com/profiles.php?XID=<id>`.
 - Update `README.md` when features, environment variables or flows change.
 - **Git:**
-  - Branch off for each piece of work; `main` deploys on push, so never commit to it directly.
+  - `main` deploys on push, so never commit to it directly.
   - Commit subjects are past tense and capitalized, with no prefix and at most 72 characters ("Moved shared types and DTOs into src/models"), then short bullets for what and why.
   - Answer a request for a commit message right away, even in the middle of other work.
   - Commit at logical checkpoints instead of piling several features into one diff.

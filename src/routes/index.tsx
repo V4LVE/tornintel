@@ -528,7 +528,7 @@ function Home() {
           {combatBarsError && <p className="combat-error">{combatBarsError}</p>}
           <div className="chain-keep-alive">
             <h3>Keep the chain alive</h3>
-            <p>Find a random available player you beat in the last 14 days.</p>
+            <p>Find an available target from the shared levelling list.</p>
             <button
               className="refresh-button"
               onClick={() => void findChainTarget()}
@@ -541,18 +541,12 @@ function Home() {
                   : 'Find keep-alive target'}
             </button>
             <div aria-live="polite" aria-busy={isFindingChainTarget}>
+              {chainTarget?.warning && <p>{chainTarget.warning}</p>}
               {chainTarget?.target && (
                 <div className="chain-target">
                   <strong>{chainTarget.target.name}</strong>
                   <span>
                     #{chainTarget.target.id} · Level {chainTarget.target.level}
-                  </span>
-                  <span>
-                    Last beaten{' '}
-                    {new Date(
-                      chainTarget.target.lastWonAt,
-                    ).toLocaleDateString()}
-                    . Previous wins suggest you can beat them again.
                   </span>
                   {chainTargetFresh &&
                   (!energyNow || energyNow.current >= 25) ? (

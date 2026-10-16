@@ -4,6 +4,7 @@ export type PayoutPlayer = {
   id: string
   name: string
   warHits: number
+  // Successful outside attacks that contributed to the faction chain during the war.
   nonWarHits: number
 }
 
